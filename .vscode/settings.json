@@ -1,0 +1,15 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5431,
+            "askForPassword": true,
+            "driver": "PostgreSQL",
+            "database": "alcatraz",
+            "username": "postgres",
+            "name": "alcatraz"
+        }
+    ]
+}
