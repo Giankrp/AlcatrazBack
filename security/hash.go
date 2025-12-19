@@ -55,7 +55,7 @@ func VerifyPassword(password, encoded string) (bool, error) {
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false, errors.New("invalid hash format")
 	}
-	// parts: ["", "argon2id", "v=19", "m=..,t=..,p=..", salt, hash]
+	// partes: ["", "argon2id", "v=19", "m=..,t=..,p=..", salt, hash]
 	paramsStr := parts[3]
 	saltStr := parts[4]
 	hashStr := parts[5]
