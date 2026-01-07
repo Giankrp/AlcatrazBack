@@ -1,9 +1,14 @@
 package main
 
 import (
-	"github.com/Giankrp/AlcatrazBack/db"
-
 	"net/http"
+	"os"
+
+	"github.com/Giankrp/AlcatrazBack/db"
+	"github.com/Giankrp/AlcatrazBack/handlers"
+	"github.com/Giankrp/AlcatrazBack/repositories"
+	"github.com/Giankrp/AlcatrazBack/routes"
+	"github.com/Giankrp/AlcatrazBack/services"
 
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
@@ -11,26 +16,73 @@ import (
 )
 
 func main() {
-	err := godotenv.Load()
+	// 1. Load configuration
+	if err := godotenv.Load(); err != nil {
+		// Log but continue (env vars might be set in system)
+		// e.Logger.Warn("Error loading .env file")
+	}
 
+	// 2. Initialize Echo
 	e := echo.New()
-	if err != nil {
-		e.Logger.Fatal("Error loading .env file")
-	}
 
-	err = db.DbConnection()
-	if err != nil {
-		e.Logger.Fatal("Error connecting to database")
-	}
-
-	err = db.AutoMigrate()
-	if err != nil {
-		e.Logger.Fatal("Error migrating database")
-	}
-
+	// 3. Middleware
 	e.Use(middleware.Logger())
-	e.GET("/", func(c echo.Context) error {
-		return c.String(http.StatusOK, "Hello, World!")
-	})
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Use(middleware.Recover())
+	e.Use(middleware.CORS())
+
+	// 4. Custom Error Handler
+	e.HTTPErrorHandler = customHTTPErrorHandler
+
+	// 5. Database Connection
+	database, err := db.NewConnection()
+	if err != nil {
+		e.Logger.Fatal("Error connecting to database: ", err)
+	}
+
+	// 6. Database Migration
+	if err := db.AutoMigrate(database); err != nil {
+		e.Logger.Fatal("Error migrating database: ", err)
+	}
+
+	// 7. Dependency Injection (Wiring)
+	// Repositories
+	userRepo := repositories.NewUserRepository(database)
+
+	// Services
+	authService := services.NewAuthService(userRepo)
+
+	// Handlers
+	authHandler := handlers.NewAuthHandler(authService)
+
+	// 8. Routes
+	routes.SetupRoutes(e, authHandler)
+
+	// 9. Start Server
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	e.Logger.Fatal(e.Start(":" + port))
+}
+
+func customHTTPErrorHandler(err error, c echo.Context) {
+	code := http.StatusInternalServerError
+	message := "Internal Server Error"
+
+	if he, ok := err.(*echo.HTTPError); ok {
+		code = he.Code
+		message = he.Message.(string)
+	}
+
+	// Send JSON response
+	if !c.Response().Committed {
+		if c.Request().Method == http.MethodHead {
+			err = c.NoContent(code)
+		} else {
+			err = c.JSON(code, echo.Map{"error": message})
+		}
+		if err != nil {
+			c.Logger().Error(err)
+		}
+	}
 }

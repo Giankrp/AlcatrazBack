@@ -1,6 +1,7 @@
 package db
 
 import (
+	"errors"
 	"os"
 
 	"github.com/Giankrp/AlcatrazBack/models"
@@ -9,20 +10,20 @@ import (
 	"gorm.io/gorm"
 )
 
-var DB *gorm.DB
-
-func DbConnection() error {
-
+func NewConnection() (*gorm.DB, error) {
 	dsn := os.Getenv("DATABASE_URL")
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		return err
+	if dsn == "" {
+		return nil, errors.New("DATABASE_URL environment variable is not set")
 	}
 
-	DB = db
-	return nil
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
-func AutoMigrate() error {
-	return DB.AutoMigrate(&models.User{}, &models.VaultItem{}, &models.VaultFolder{}, &models.Session{})
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(&models.User{}, &models.VaultItem{}, &models.VaultFolder{}, &models.Session{})
 }
