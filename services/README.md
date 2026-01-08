@@ -1,33 +1,19 @@
-# Services Package (`services`)
+# Services Package
 
-Este paquete contiene la **Lógica de Negocio** de la aplicación. Es el núcleo funcional del sistema.
+Este paquete encapsula la **Lógica de Negocio** de la aplicación. Es el núcleo funcional que orquesta las operaciones entre los Handlers y los Repositorios.
 
 ## Responsabilidades
-- Implementar las reglas de negocio (ej. validaciones complejas, flujos de registro).
-- Orquestar llamadas a repositorios y otros componentes (como seguridad).
-- Transformar DTOs (Data Transfer Objects) en Modelos de dominio y viceversa.
-- Generar tokens JWT y manejar autenticación.
 
-## Estructura
-Al igual que los repositorios, los servicios se definen por interfaces para facilitar el testing y desacoplamiento.
+1.  **Reglas de Negocio**: Aplica validaciones lógicas (ej: "¿El usuario tiene permiso para editar este item?", "El email ya está registrado?").
+2.  **Transformación de Datos**: Convierte DTOs (entrada) a Modelos de Dominio (base de datos) y viceversa.
+3.  **Coordinación**: Puede llamar a múltiples repositorios u otros servicios para completar una tarea.
+4.  **Seguridad de Acceso**: Asegura que las operaciones se realicen sobre los recursos correctos (ej: filtrar siempre por `UserID`).
 
-## Ejemplo: `AuthService`
+## Componentes
 
-### Funcionalidades
-- **Register**:
-  - Verifica si el email ya existe usando `UserRepository`.
-  - Hashea la contraseña usando el paquete `security`.
-  - Crea el usuario en la base de datos.
-- **Login**:
-  - Busca el usuario por email.
-  - Verifica la contraseña hasheada.
-  - Genera y firma un token JWT.
+*   **`AuthService`**: Lógica de autenticación (hashing de contraseñas, generación de tokens JWT).
+*   **`VaultService`**: Lógica de gestión de items (creación, actualización segura, borrado lógico).
 
-### Inyección de Dependencias
-Los servicios reciben los repositorios necesarios en su constructor:
+## Independencia
 
-```go
-type authService struct {
-    userRepo repositories.UserRepository
-}
-```
+Los servicios son independientes del transporte (HTTP). Podrían ser invocados por una CLI, gRPC o tareas programadas sin cambios en su código, ya que no dependen de `echo.Context`.

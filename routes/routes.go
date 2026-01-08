@@ -1,11 +1,14 @@
 package routes
 
 import (
+	"os"
+
 	"github.com/Giankrp/AlcatrazBack/handlers"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 )
 
-func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler) {
+func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *handlers.VaultHandler) {
 	// API Group
 	api := e.Group("/api")
 
@@ -13,4 +16,22 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler) {
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
+
+	// Protected routes
+	protected := api.Group("")
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "secret" // Fallback para dev, idealmente fatal error en prod
+	}
+	protected.Use(echojwt.WithConfig(echojwt.Config{
+		SigningKey: []byte(jwtSecret),
+	}))
+
+	// Vault routes
+	vault := protected.Group("/vault")
+	vault.POST("/items", vaultHandler.CreateItem)
+	vault.GET("/items", vaultHandler.GetItems)
+	vault.GET("/items/:id", vaultHandler.GetItem)
+	vault.PUT("/items/:id", vaultHandler.UpdateItem)
+	vault.DELETE("/items/:id", vaultHandler.DeleteItem)
 }

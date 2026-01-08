@@ -1,31 +1,27 @@
-# Handlers Package (`handlers`)
+# Handlers Package
 
-Este paquete actúa como la capa de entrada HTTP (Controladores). Gestiona la interacción con el cliente (request/response).
+Este paquete contiene los **Controladores HTTP** (Handlers) de la aplicación. Su única responsabilidad es manejar la capa de transporte HTTP.
 
 ## Responsabilidades
-- Recibir peticiones HTTP (vía Echo framework).
-- Validar el formato de entrada (Binding de JSON a DTOs).
-- Validar reglas de formato (usando paquete `validator`).
-- Llamar a los Servicios correspondientes para ejecutar la lógica.
-- Formatear la respuesta HTTP (JSON) y códigos de estado (200, 400, 500, etc.).
 
-## Flujo Típico
+1.  **Recibir Peticiones**: Escucha los endpoints definidos en `routes`.
+2.  **Parsear Entrada**: Extrae parámetros de URL, query params y el cuerpo (Body) de la petición (JSON).
+3.  **Validación**: Usa el paquete `dto` y `validator` para asegurar que los datos de entrada sean sintácticamente correctos.
+4.  **Llamar al Servicio**: Invoca a la lógica de negocio (Service) correspondiente.
+5.  **Formatear Respuesta**: Convierte los resultados (o errores) del servicio en respuestas HTTP estándar (JSON + Código de Estado).
 
-1. **Bind**: `c.Bind(&dto)` lee el JSON del body.
-2. **Validate**: `validator.Validate.Struct(&dto)` verifica reglas (required, email, min len).
-3. **Service Call**: `h.service.Metodo(dto)` ejecuta la acción.
-4. **Response**: `c.JSON(status, data)` devuelve el resultado.
+## Componentes
 
-## Ejemplo: `AuthHandler`
-Maneja rutas como `/api/auth/register` y `/api/auth/login`.
+*   **`AuthHandler`**: Maneja registro (`/register`) y login (`/login`).
+*   **`VaultHandler`**: Maneja CRUD de items (`/vault/items`).
+*   **`UserHandler`** (Futuro): Gestión de perfil de usuario.
 
-```go
-func (h *AuthHandler) Login(c echo.Context) error {
-    // 1. Bind
-    // 2. Validate
-    // 3. Call Service
-    token, err := h.authService.Login(loginDTO)
-    // 4. Response
-    return c.JSON(http.StatusOK, map[string]string{"token": token})
-}
-```
+## Ejemplo de Flujo (Create Item)
+
+1.  `VaultHandler.CreateItem` recibe `POST /vault/items`.
+2.  Extrae el JWT para obtener el `userID`.
+3.  Parsea el JSON body a `dto.CreateVaultItemDTO`.
+4.  Valida el DTO.
+5.  Llama a `vaultService.CreateItem(userID, dto)`.
+6.  Si hay éxito, devuelve `201 Created` con el item.
+7.  Si hay error, devuelve `400 Bad Request` o `500 Internal Server Error`.

@@ -1,36 +1,47 @@
-# AlcatrazBack API
+# Alcatraz Backend
 
-Backend para el gestor de contraseñas Alcatraz. Construido con **Go (Golang)**, **Echo**, **GORM** y **PostgreSQL**, siguiendo una arquitectura limpia y modular.
+Backend para el gestor de contraseñas Alcatraz. Construido en Go usando Echo, GORM y Argon2id, diseñado con una arquitectura segura y escalable.
 
-## Arquitectura
+## Características Principales
 
-El proyecto sigue una estructura de capas (Clean Architecture simplificada) para separar responsabilidades, facilitar el testing y el mantenimiento.
+*   **Arquitectura Limpia (Clean Architecture)**: Separación clara de responsabilidades (Handlers, Services, Repositories).
+*   **Seguridad Zero Knowledge**: El backend actúa como un almacén ciego de datos cifrados.
+*   **Autenticación Robusta**: Hashing de contraseñas con Argon2id y sesiones vía JWT.
+*   **Base de Datos**: PostgreSQL (vía GORM) para persistencia relacional y JSONB.
+*   **API RESTful**: Endpoints estandarizados y documentados.
 
-### Capas Principales
-1.  **Routes (`routes/`)**: Define los endpoints y conecta URLs con Handlers.
-2.  **Handlers (`handlers/`)**: Controladores HTTP. Validan entrada (DTOs) y llaman a Servicios.
-3.  **Services (`services/`)**: Lógica de negocio pura. Orquestan operaciones y validan reglas de dominio.
-4.  **Repositories (`repositories/`)**: Acceso a datos. Interactúan con la base de datos vía GORM.
-5.  **Models (`models/`)**: Entidades de dominio mapeadas a la base de datos.
+## Estructura del Proyecto
 
-### Componentes Transversales
--   **DB (`db/`)**: Configuración y conexión a PostgreSQL.
--   **DTO (`dto/`)**: Objetos de transferencia de datos (JSON shapes).
--   **Security (`security/`)**: Utilidades criptográficas (Argon2id para contraseñas).
--   **Validator (`validator/`)**: Reglas de validación de entrada.
+```
+AlcatrazBack/
+├── db/             # Configuración y conexión a base de datos
+├── docs/           # Documentación detallada del proyecto
+├── dto/            # Data Transfer Objects (Validación de entrada)
+├── handlers/       # Controladores HTTP (Entrada/Salida)
+├── models/         # Modelos de base de datos (GORM)
+├── repositories/   # Acceso a datos (SQL/ORM)
+├── routes/         # Definición de rutas y grupos de API
+├── security/       # Utilidades criptográficas (Argon2, etc.)
+├── services/       # Lógica de negocio
+└── main.go         # Punto de entrada y configuración
+```
 
 ## Requisitos
 
--   Go 1.22+
--   PostgreSQL
+*   Go 1.20+
+*   PostgreSQL (o MySQL configurado en driver)
 
 ## Configuración
 
-Crear un archivo `.env` en la raíz del proyecto con las siguientes variables:
+Crea un archivo `.env` en la raíz del proyecto:
 
 ```env
-DATABASE_URL=postgres://user:password@localhost:5432/dbname?sslmode=disable
-JWT_SECRET=tu_secreto_seguro_para_jwt
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=password
+DB_NAME=alcatraz_db
+DB_PORT=3306
+JWT_SECRET=tu_secreto_super_seguro
 PORT=8080
 ```
 
@@ -41,29 +52,13 @@ PORT=8080
     go mod download
     ```
 
-2.  **Ejecutar en desarrollo**:
+2.  **Ejecutar servidor**:
     ```bash
-    go run .
+    go run main.go
     ```
-    El servidor iniciará en `http://localhost:8080` (o el puerto definido).
+    El servidor iniciará en `http://localhost:8080`.
 
-3.  **Compilar**:
-    ```bash
-    go build -o alcatraz-api .
-    ./alcatraz-api
-    ```
+## Documentación Detallada
 
-## Flujo de Desarrollo
-
-1.  Definir modelo en `models/` (si es nuevo).
-2.  Definir operaciones de DB en `repositories/`.
-3.  Definir DTOs de entrada/salida en `dto/`.
-4.  Implementar lógica en `services/`.
-5.  Crear handler en `handlers/`.
-6.  Registrar ruta en `routes/`.
-7.  Inyectar dependencias en `main.go`.
-
-## Seguridad
-
--   **Contraseñas**: Hashing robusto con **Argon2id** + Salt aleatoria única por usuario.
--   **Autenticación**: JWT (JSON Web Tokens) firmados con HS256.
+*   [Flujo de Datos y Seguridad (Zero Knowledge)](docs/DATA_FLOW.md)
+*   Ver `README.md` en cada subdirectorio para detalles de implementación específicos.

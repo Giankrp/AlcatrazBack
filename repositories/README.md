@@ -1,33 +1,21 @@
-# Repositories Package (`repositories`)
+# Repositories Package
 
-Este paquete implementa el patrón **Repository** para abstraer el acceso a datos. Es la única capa que interactúa directamente con la base de datos (GORM).
+Este paquete maneja el **Acceso a Datos** (DAL - Data Access Layer). Abstrae la base de datos subyacente (PostgreSQL) del resto de la aplicación.
 
 ## Responsabilidades
-- Realizar operaciones CRUD (Create, Read, Update, Delete) sobre la base de datos.
-- Desacoplar la lógica de negocio (Services) de la implementación de base de datos.
-- Convertir modelos de base de datos a estructuras utilizables por la aplicación.
 
-## Estructura
-Cada repositorio tiene:
-1. **Interfaz**: Define los métodos disponibles (contrato).
-2. **Implementación**: Estructura concreta que usa `*gorm.DB`.
-3. **Constructor**: Función `New...` para inyectar la dependencia de base de datos.
+1.  **Consultas SQL**: Ejecuta queries `SELECT`, `INSERT`, `UPDATE`, `DELETE` usando GORM.
+2.  **Mapeo Objeto-Relacional**: Convierte registros de base de datos a structs de Go (`models`).
+3.  **Transacciones**: (Opcional) Maneja transacciones atómicas si una operación toca múltiples tablas.
 
-## Ejemplo: `UserRepository`
+## Patrón Repository
 
-### Interfaz
-```go
-type UserRepository interface {
-    Create(user *models.User) error
-    FindByEmail(email string) (*models.User, error)
-}
-```
+Usamos interfaces (`UserRepository`, `VaultRepository`) para definir los contratos. Esto permite:
+*   **Testabilidad**: Podemos inyectar repositorios falsos (mocks) en los tests unitarios de los servicios.
+*   **Flexibilidad**: Podríamos cambiar GORM por SQLx o MongoDB reimplementando solo esta capa, sin tocar servicios ni handlers.
 
-### Uso en Servicios
-El repositorio se inyecta en los servicios, permitiendo que la lógica de negocio no conozca detalles de SQL o GORM.
+## Consultas Seguras
 
-```go
-func NewAuthService(userRepo repositories.UserRepository) AuthService {
-    return &authService{userRepo: userRepo}
-}
-```
+Todos los repositorios deben respetar el contexto del usuario (`UserID`).
+*   **Mal**: `FindByID(id)` -> Podría devolver un item de otro usuario.
+*   **Bien**: `FindByID(id, userID)` -> Garantiza que solo el dueño acceda al dato.

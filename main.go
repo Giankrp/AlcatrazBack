@@ -47,15 +47,18 @@ func main() {
 	// 7. Dependency Injection (Wiring)
 	// Repositories
 	userRepo := repositories.NewUserRepository(database)
+	vaultRepo := repositories.NewVaultRepository(database)
 
 	// Services
 	authService := services.NewAuthService(userRepo)
+	vaultService := services.NewVaultService(vaultRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	vaultHandler := handlers.NewVaultHandler(vaultService)
 
 	// 8. Routes
-	routes.SetupRoutes(e, authHandler)
+	routes.SetupRoutes(e, authHandler, vaultHandler)
 
 	// 9. Start Server
 	port := os.Getenv("PORT")
