@@ -28,7 +28,7 @@ func (s *vaultService) CreateItem(userID string, input dto.CreateVaultItemDTO) (
 	item := &models.VaultItem{
 		UserID:        userID,
 		FolderID:      input.FolderID,
-		Type:          models.VaultItemType(input.Type),
+		ItemType:      models.VaultItemType(input.ItemType),
 		Title:         input.Title,
 		Icon:          input.Icon,
 		EncryptedData: input.EncryptedData,
@@ -59,8 +59,8 @@ func (s *vaultService) UpdateItem(userID string, itemID string, input dto.Update
 	if input.FolderID != nil {
 		item.FolderID = input.FolderID
 	}
-	if input.Type != "" {
-		item.Type = models.VaultItemType(input.Type)
+	if input.ItemType != "" {
+		item.ItemType = models.VaultItemType(input.ItemType)
 	}
 	if input.Title != "" {
 		item.Title = input.Title

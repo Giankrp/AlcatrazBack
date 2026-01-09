@@ -19,7 +19,7 @@ type VaultItem struct {
 	ID       string        `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID   string        `gorm:"index;not null"`
 	FolderID *string       `gorm:"index"`
-	Type     VaultItemType `gorm:"not null;index"`
+	ItemType VaultItemType `gorm:"column:item_type;not null;index"`
 
 	// BaseVaultItem (Visible/Metadata)
 	Title   string `gorm:"not null"`

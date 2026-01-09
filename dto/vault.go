@@ -11,7 +11,7 @@ const (
 
 type CreateVaultItemDTO struct {
 	FolderID *string       `json:"folder_id"`
-	Type     VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
+	ItemType VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
 	Title    string        `json:"title" validate:"required"`
 	Icon     string        `json:"icon"`
 
@@ -25,7 +25,7 @@ type CreateVaultItemDTO struct {
 
 type UpdateVaultItemDTO struct {
 	FolderID      *string       `json:"folder_id"`
-	Type          VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
+	ItemType      VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
 	Title         string        `json:"title"`
 	Icon          string        `json:"icon"`
 	Trashed       *bool         `json:"trashed"`
