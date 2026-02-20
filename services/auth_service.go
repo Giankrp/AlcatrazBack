@@ -72,12 +72,12 @@ func (s *authService) Login(loginDTO dto.LoginDTO) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
-		"exp":     time.Now().Add(time.Hour * 72).Unix(),
+		"exp":     time.Now().Add(time.Hour * 12).Unix(),
 	})
 
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
-		secret = "default_secret_change_me" // Fallback only for dev
+		return "", errors.New("JWT_SECRET environment variable is not set")
 	}
 
 	return token.SignedString([]byte(secret))

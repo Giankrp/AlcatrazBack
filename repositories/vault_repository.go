@@ -27,8 +27,8 @@ func (r *vaultRepository) Create(item *models.VaultItem) error {
 
 func (r *vaultRepository) FindByID(id string, userID string) (*models.VaultItem, error) {
 	var item models.VaultItem
-	// Buscamos por ID y UserID para asegurar que el item pertenece al usuario
-	if err := r.db.Where("id = ? AND user_id = ?", id, userID).First(&item).Error; err != nil {
+	// Preload Secret for details view
+	if err := r.db.Preload("Secret").Where("id = ? AND user_id = ?", id, userID).First(&item).Error; err != nil {
 		return nil, err
 	}
 	return &item, nil
@@ -36,6 +36,7 @@ func (r *vaultRepository) FindByID(id string, userID string) (*models.VaultItem,
 
 func (r *vaultRepository) FindAllByUserID(userID string) ([]models.VaultItem, error) {
 	var items []models.VaultItem
+	// Do NOT Preload Secret for list view (Performance Optimization)
 	if err := r.db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&items).Error; err != nil {
 		return nil, err
 	}
@@ -43,11 +44,13 @@ func (r *vaultRepository) FindAllByUserID(userID string) ([]models.VaultItem, er
 }
 
 func (r *vaultRepository) Update(item *models.VaultItem) error {
-	return r.db.Save(item).Error
+	// Save essentially does a full update (upsert) on the model and its associations if configured
+	// But to be safe and explicit with GORM associations, usually Session.Save works for the primary model.
+	// For associations, we might need to be careful. However, with FullSaveAssociations or manual handling:
+	// Let's use a transaction to ensure both are updated if we pass the whole object.
+	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(item).Error
 }
 
 func (r *vaultRepository) Delete(id string, userID string) error {
-	// Soft delete (o hard delete si prefieres)
-	// Aquí usamos Delete de GORM que manejará Soft Delete si DeletedAt existe en el modelo
 	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.VaultItem{}).Error
 }

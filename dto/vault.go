@@ -16,22 +16,21 @@ type CreateVaultItemDTO struct {
 	Icon     string        `json:"icon"`
 
 	// Encrypted Blob (JSON stringificado y cifrado)
-	EncryptedData string `json:"encrypted_data" validate:"required"`
-
-	// Encryption Params
-	IV   string `json:"iv" validate:"required"`
-	Salt string `json:"salt" validate:"required"`
+	Secret Secret `json:"secret" validate:"required"`
 }
 
+type Secret struct {
+	Data string `json:"data" validate:"required"`
+	Iv   string `json:"iv" validate:"required"`
+	Salt string `json:"salt" validate:"required"`
+}
 type UpdateVaultItemDTO struct {
-	FolderID      *string       `json:"folder_id"`
-	ItemType      VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
-	Title         string        `json:"title"`
-	Icon          string        `json:"icon"`
-	Trashed       *bool         `json:"trashed"`
-	EncryptedData string        `json:"encrypted_data"`
-	IV            string        `json:"iv"`
-	Salt          string        `json:"salt"`
+	FolderID *string       `json:"folder_id"`
+	ItemType VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
+	Title    string        `json:"title"`
+	Icon     string        `json:"icon"`
+	Trashed  *bool         `json:"trashed"`
+	Secret   Secret        `json:"secret" validate:"required"`
 }
 
 type CreateVaultFolderDTO struct {

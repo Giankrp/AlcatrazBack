@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"log"
 	"os"
 
 	"github.com/Giankrp/AlcatrazBack/handlers"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 )
 
@@ -17,19 +19,19 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	auth.POST("/login", authHandler.Login)
 
 	// Protected routes
-	//protected := api.Group("")
+	protected := api.Group("")
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		jwtSecret = "secret" // Fallback para dev, idealmente fatal error en prod
+		log.Fatal("JWT_SECRET environment variable is not set")
 	}
 
-	// MODO DESARROLLO: Middleware JWT desactivado temporalmente para pruebas fáciles
-	// protected.Use(echojwt.WithConfig(echojwt.Config{
-	// 	SigningKey: []byte(jwtSecret),
-	// }))
+	// Apply JWT middleware to protected group
+	protected.Use(echojwt.WithConfig(echojwt.Config{
+		SigningKey: []byte(jwtSecret),
+	}))
 
 	// Vault routes
-	vault := e.Group("/vault")
+	vault := protected.Group("/vault")
 	vault.POST("/items", vaultHandler.CreateItem)
 	vault.GET("/items", vaultHandler.GetItems)
 	vault.GET("/items/:id", vaultHandler.GetItem)

@@ -113,19 +113,17 @@ func getUserIDFromToken(c echo.Context) string {
 	// Verificar si el contexto tiene el usuario
 	userToken, ok := c.Get("user").(*jwt.Token)
 	if !ok || userToken == nil {
-		// MODO DESARROLLO: Si no hay token, devolvemos un ID de prueba fijo
-		// Esto permite probar la API sin hacer login
-		return "dev-test-user-id-123"
+		return ""
 	}
 
 	claims, ok := userToken.Claims.(jwt.MapClaims)
 	if !ok {
-		return "dev-test-user-id-123"
+		return ""
 	}
 
 	userID, ok := claims["user_id"].(string)
 	if !ok {
-		return "dev-test-user-id-123"
+		return ""
 	}
 
 	return userID

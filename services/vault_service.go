@@ -26,14 +26,16 @@ func NewVaultService(repo repositories.VaultRepository) VaultService {
 
 func (s *vaultService) CreateItem(userID string, input dto.CreateVaultItemDTO) (*models.VaultItem, error) {
 	item := &models.VaultItem{
-		UserID:        userID,
-		FolderID:      input.FolderID,
-		ItemType:      models.VaultItemType(input.ItemType),
-		Title:         input.Title,
-		Icon:          input.Icon,
-		EncryptedData: input.EncryptedData,
-		IV:            input.IV,
-		Salt:          input.Salt,
+		UserID:   userID,
+		FolderID: input.FolderID,
+		ItemType: models.VaultItemType(input.ItemType),
+		Title:    input.Title,
+		Icon:     input.Icon,
+		Secret: &models.VaultSecret{
+			EncryptedData: input.Secret.Data,
+			IV:            input.Secret.Iv,
+			Salt:          input.Secret.Salt,
+		},
 	}
 
 	if err := s.repo.Create(item); err != nil {
@@ -68,15 +70,22 @@ func (s *vaultService) UpdateItem(userID string, itemID string, input dto.Update
 	if input.Icon != "" {
 		item.Icon = input.Icon
 	}
-	if input.EncryptedData != "" {
-		item.EncryptedData = input.EncryptedData
+	// Update Secret Data
+	if input.Secret.Data != "" || input.Secret.Iv != "" || input.Secret.Salt != "" {
+		if item.Secret == nil {
+			item.Secret = &models.VaultSecret{VaultItemID: item.ID}
+		}
+		if input.Secret.Data != "" {
+			item.Secret.EncryptedData = input.Secret.Data
+		}
+		if input.Secret.Iv != "" {
+			item.Secret.IV = input.Secret.Iv
+		}
+		if input.Secret.Salt != "" {
+			item.Secret.Salt = input.Secret.Salt
+		}
 	}
-	if input.IV != "" {
-		item.IV = input.IV
-	}
-	if input.Salt != "" {
-		item.Salt = input.Salt
-	}
+
 	if input.Trashed != nil {
 		item.Trashed = *input.Trashed
 	}

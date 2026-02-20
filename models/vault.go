@@ -26,23 +26,26 @@ type VaultItem struct {
 	Icon    string `gorm:"default:'default_icon'"`
 	Trashed bool   `gorm:"default:false;index"`
 
+	// Relation
+	Secret *VaultSecret `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"` // HasOne relation
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time `gorm:"index"` // Soft delete
+}
+
+// VaultSecret holds the heavy encrypted data.
+// It is separated to allow list queries without loading this blob.
+type VaultSecret struct {
+	VaultItemID string `gorm:"primaryKey"` // Uses the same ID as VaultItem for 1:1
+
 	// Specific Data (Encrypted)
-	// En el frontend:
-	// - PasswordItem: { username, password, url }
-	// - NoteItem: { note }
-	// - CardItem: { holder, number, expiry, cvv }
-	// - IdentityItem: { firstName, lastName, email, phone, address }
-	//
-	// Todo este objeto específico se serializa a JSON, se cifra, y se guarda aquí.
+	// Serialized JSON of specific item data (PasswordItem, NoteItem, etc.)
 	EncryptedData string `gorm:"not null"`
 
 	// Encryption Metadata
 	IV   string `gorm:"not null"`
-	Salt string `gorm:"not null"` // Si usas KDF único por item
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time `gorm:"index"` // Soft delete para "papelera" real si se desea
+	Salt string `gorm:"not null"`
 }
 
 // Estructura auxiliar para guardar datos adicionales NO cifrados si fuera necesario (ej. tags)

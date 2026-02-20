@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/Giankrp/AlcatrazBack/db"
 	"github.com/Giankrp/AlcatrazBack/handlers"
@@ -28,7 +30,20 @@ func main() {
 	// 3. Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(middleware.CORS())
+
+	allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+	var allowedOrigins []string
+	if allowedOriginsEnv != "" {
+		allowedOrigins = strings.Split(allowedOriginsEnv, ",")
+	} else {
+		allowedOrigins = []string{"*"} // Fallback as warning or strictly to be defined
+		e.Logger.Warn("ALLOWED_ORIGINS is not set. Defaulting to '*' which is insecure for production.")
+	}
+
+	fmt.Println(os.Getenv("JWT_SECRET"))
+	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins: allowedOrigins,
+	}))
 
 	// 4. Custom Error Handler
 	e.HTTPErrorHandler = customHTTPErrorHandler

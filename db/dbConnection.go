@@ -25,5 +25,5 @@ func NewConnection() (*gorm.DB, error) {
 }
 
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(&models.User{}, &models.VaultItem{}, &models.VaultFolder{}, &models.Session{})
+	return db.AutoMigrate(&models.User{}, &models.VaultItem{}, &models.VaultSecret{}, &models.VaultFolder{}, &models.Session{})
 }
