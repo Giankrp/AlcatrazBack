@@ -17,6 +17,7 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	auth := api.Group("/auth")
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
+	auth.POST("/logout", authHandler.Logout)
 
 	// Protected routes
 	protected := api.Group("")
@@ -25,9 +26,10 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 		log.Fatal("JWT_SECRET environment variable is not set")
 	}
 
-	// Apply JWT middleware to protected group
+	// Apply JWT middleware — read token from HttpOnly cookie
 	protected.Use(echojwt.WithConfig(echojwt.Config{
-		SigningKey: []byte(jwtSecret),
+		SigningKey:  []byte(jwtSecret),
+		TokenLookup: "cookie:auth_token",
 	}))
 
 	// Vault routes

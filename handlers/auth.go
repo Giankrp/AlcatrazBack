@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Giankrp/AlcatrazBack/dto"
 	"github.com/Giankrp/AlcatrazBack/services"
@@ -57,5 +58,34 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
 	}
 
-	return c.JSON(http.StatusOK, echo.Map{"token": token})
+	// Set JWT as HttpOnly cookie
+	cookie := &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   60 * 60 * 12, // 12 hours
+	}
+	c.SetCookie(cookie)
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+}
+
+func (h *AuthHandler) Logout(c echo.Context) error {
+	// Expire the auth cookie
+	cookie := &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+	}
+	c.SetCookie(cookie)
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "logged out successfully"})
 }

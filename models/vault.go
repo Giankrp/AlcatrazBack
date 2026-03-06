@@ -18,6 +18,7 @@ const (
 type VaultItem struct {
 	ID       string        `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
 	UserID   string        `gorm:"index;not null"`
+	User     User          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;"`
 	FolderID *string       `gorm:"index"`
 	ItemType VaultItemType `gorm:"column:item_type;not null;index"`
 

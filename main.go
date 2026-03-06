@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -18,16 +17,13 @@ import (
 )
 
 func main() {
-	// 1. Load configuration
+	// 1. Initialize Echo
+	e := echo.New()
 	if err := godotenv.Load(); err != nil {
-		// Log but continue (env vars might be set in system)
-		// e.Logger.Warn("Error loading .env file")
+		e.Logger.Warn("Error loading .env file")
 	}
 
-	// 2. Initialize Echo
-	e := echo.New()
-
-	// 3. Middleware
+	// 2. Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
@@ -36,30 +32,30 @@ func main() {
 	if allowedOriginsEnv != "" {
 		allowedOrigins = strings.Split(allowedOriginsEnv, ",")
 	} else {
-		allowedOrigins = []string{"*"} // Fallback as warning or strictly to be defined
+		allowedOrigins = []string{"http://localhost:3000"} // Fallback as warning or strictly to be defined
 		e.Logger.Warn("ALLOWED_ORIGINS is not set. Defaulting to '*' which is insecure for production.")
 	}
 
-	fmt.Println(os.Getenv("JWT_SECRET"))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
-		AllowOrigins: allowedOrigins,
+		AllowOrigins:     allowedOrigins,
+		AllowCredentials: true,
 	}))
 
-	// 4. Custom Error Handler
+	// 3. Custom Error Handler
 	e.HTTPErrorHandler = customHTTPErrorHandler
 
-	// 5. Database Connection
+	// 4. Database Connection
 	database, err := db.NewConnection()
 	if err != nil {
 		e.Logger.Fatal("Error connecting to database: ", err)
 	}
 
-	// 6. Database Migration
+	// 5. Database Migration
 	if err := db.AutoMigrate(database); err != nil {
 		e.Logger.Fatal("Error migrating database: ", err)
 	}
 
-	// 7. Dependency Injection (Wiring)
+	// 6. Dependency Injection (Wiring)
 	// Repositories
 	userRepo := repositories.NewUserRepository(database)
 	vaultRepo := repositories.NewVaultRepository(database)
@@ -72,10 +68,10 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 	vaultHandler := handlers.NewVaultHandler(vaultService)
 
-	// 8. Routes
+	// 7. Routes
 	routes.SetupRoutes(e, authHandler, vaultHandler)
 
-	// 9. Start Server
+	// 8. Start Server
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
