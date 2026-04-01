@@ -9,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *handlers.VaultHandler) {
+func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *handlers.VaultHandler, userProfileHandler *handlers.UserProfileHandler) {
 	// API Group
 	api := e.Group("/api")
 
@@ -18,6 +18,7 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	auth.POST("/register", authHandler.Register)
 	auth.POST("/login", authHandler.Login)
 	auth.POST("/logout", authHandler.Logout)
+	auth.GET("/exists", authHandler.UserExists)
 
 	// Protected routes
 	protected := api.Group("")
@@ -31,6 +32,11 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 		SigningKey:  []byte(jwtSecret),
 		TokenLookup: "cookie:auth_token",
 	}))
+
+	// User profile routes
+	user := protected.Group("/user")
+	user.GET("/profile", userProfileHandler.GetProfile)
+	user.PUT("/profile", userProfileHandler.UpdateProfile)
 
 	// Vault routes
 	vault := protected.Group("/vault")

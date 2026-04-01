@@ -1,0 +1,28 @@
+package services
+
+import (
+	"github.com/Giankrp/AlcatrazBack/models"
+	"github.com/Giankrp/AlcatrazBack/repositories"
+)
+
+type UserService interface {
+	GetProfile(userID string) (*models.UserProfile, error)
+	UpdateProfile(profile *models.UserProfile) error
+}
+
+type userService struct {
+	userRepo repositories.UserRepository
+}
+
+func NewUserService(userRepo repositories.UserRepository) UserService {
+	return &userService{userRepo: userRepo}
+}
+
+func (s *userService) GetProfile(userID string) (*models.UserProfile, error) {
+	return s.userRepo.FindProfileByUserID(userID)
+}
+
+func (s *userService) UpdateProfile(profile *models.UserProfile) error {
+
+	return s.userRepo.UpdateProfile(profile)
+}

@@ -8,6 +8,9 @@ import (
 type UserRepository interface {
 	Create(user *models.User) error
 	FindByEmail(email string) (*models.User, error)
+	CreateProfile(profile *models.UserProfile) error
+	FindProfileByUserID(userID string) (*models.UserProfile, error)
+	UpdateProfile(profile *models.UserProfile) error
 }
 
 type userRepository struct {
@@ -28,4 +31,20 @@ func (r *userRepository) FindByEmail(email string) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (r *userRepository) CreateProfile(profile *models.UserProfile) error {
+	return r.db.Create(profile).Error
+}
+
+func (r *userRepository) FindProfileByUserID(userID string) (*models.UserProfile, error) {
+	var profile models.UserProfile
+	if err := r.db.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+		return nil, err
+	}
+	return &profile, nil
+}
+
+func (r *userRepository) UpdateProfile(profile *models.UserProfile) error {
+	return r.db.Save(profile).Error
 }

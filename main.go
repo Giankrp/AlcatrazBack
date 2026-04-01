@@ -63,13 +63,15 @@ func main() {
 	// Services
 	authService := services.NewAuthService(userRepo)
 	vaultService := services.NewVaultService(vaultRepo)
+	userService := services.NewUserService(userRepo)
 
 	// Handlers
 	authHandler := handlers.NewAuthHandler(authService)
 	vaultHandler := handlers.NewVaultHandler(vaultService)
+	userProfileHandler := handlers.NewUserProfileHandler(userService)
 
 	// 7. Routes
-	routes.SetupRoutes(e, authHandler, vaultHandler)
+	routes.SetupRoutes(e, authHandler, vaultHandler, userProfileHandler)
 
 	// 8. Start Server
 	port := os.Getenv("PORT")

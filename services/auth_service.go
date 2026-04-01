@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Giankrp/AlcatrazBack/dto"
@@ -16,6 +17,7 @@ import (
 type AuthService interface {
 	Register(registerDTO dto.RegisterDTO) error
 	Login(loginDTO dto.LoginDTO) (string, error)
+	UserExists(email string) (bool, error)
 }
 
 type authService struct {
@@ -41,6 +43,7 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	if err != nil {
 		return err
 	}
+	name := strings.Split(registerDTO.Email, "@")[0]
 
 	user := &models.User{
 		Email:        registerDTO.Email,
@@ -48,7 +51,15 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 		CreatedAt:    time.Now(),
 	}
 
-	return s.userRepo.Create(user)
+	if err := s.userRepo.Create(user); err != nil {
+		return err
+	}
+
+	profile := &models.UserProfile{
+		UserID: user.ID,
+		Name:   name,
+	}
+	return s.userRepo.CreateProfile(profile)
 }
 
 func (s *authService) Login(loginDTO dto.LoginDTO) (string, error) {
@@ -81,4 +92,15 @@ func (s *authService) Login(loginDTO dto.LoginDTO) (string, error) {
 	}
 
 	return token.SignedString([]byte(secret))
+}
+
+func (s *authService) UserExists(email string) (bool, error) {
+	_, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }

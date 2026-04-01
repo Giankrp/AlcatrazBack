@@ -89,3 +89,17 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, echo.Map{"message": "logged out successfully"})
 }
+
+func (h *AuthHandler) UserExists(c echo.Context) error {
+	email := c.QueryParam("email")
+	if email == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "email query parameter is required"})
+	}
+
+	exists, err := h.authService.UserExists(email)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"exists": exists})
+}
