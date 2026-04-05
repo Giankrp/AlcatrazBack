@@ -45,4 +45,10 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	vault.GET("/items/:id", vaultHandler.GetItem)
 	vault.PUT("/items/:id", vaultHandler.UpdateItem)
 	vault.DELETE("/items/:id", vaultHandler.DeleteItem)
+
+	// Folder routes
+	vault.POST("/folders", vaultHandler.CreateFolder)
+	vault.GET("/folders", vaultHandler.GetFolders)
+	vault.PUT("/folders/:id", vaultHandler.UpdateFolder)
+	vault.DELETE("/folders/:id", vaultHandler.DeleteFolder)
 }

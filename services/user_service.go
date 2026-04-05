@@ -3,10 +3,11 @@ package services
 import (
 	"github.com/Giankrp/AlcatrazBack/models"
 	"github.com/Giankrp/AlcatrazBack/repositories"
+	"github.com/google/uuid"
 )
 
 type UserService interface {
-	GetProfile(userID string) (*models.UserProfile, error)
+	GetProfile(userID uuid.UUID) (*models.UserProfile, error)
 	UpdateProfile(profile *models.UserProfile) error
 }
 
@@ -18,7 +19,7 @@ func NewUserService(userRepo repositories.UserRepository) UserService {
 	return &userService{userRepo: userRepo}
 }
 
-func (s *userService) GetProfile(userID string) (*models.UserProfile, error) {
+func (s *userService) GetProfile(userID uuid.UUID) (*models.UserProfile, error) {
 	return s.userRepo.FindProfileByUserID(userID)
 }
 

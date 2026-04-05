@@ -21,11 +21,12 @@ type AuthService interface {
 }
 
 type authService struct {
-	userRepo repositories.UserRepository
+	userRepo  repositories.UserRepository
+	vaultRepo repositories.VaultRepository
 }
 
-func NewAuthService(userRepo repositories.UserRepository) AuthService {
-	return &authService{userRepo: userRepo}
+func NewAuthService(userRepo repositories.UserRepository, vaultRepo repositories.VaultRepository) AuthService {
+	return &authService{userRepo: userRepo, vaultRepo: vaultRepo}
 }
 
 func (s *authService) Register(registerDTO dto.RegisterDTO) error {
@@ -59,7 +60,17 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 		UserID: user.ID,
 		Name:   name,
 	}
-	return s.userRepo.CreateProfile(profile)
+	if err := s.userRepo.CreateProfile(profile); err != nil {
+		return err
+	}
+
+	// Create default "Personal" folder
+	defaultFolder := &models.VaultFolder{
+		UserID:    user.ID,
+		Name:      "Personal",
+		IsDefault: true,
+	}
+	return s.vaultRepo.CreateFolder(defaultFolder)
 }
 
 func (s *authService) Login(loginDTO dto.LoginDTO) (string, error) {
@@ -81,7 +92,7 @@ func (s *authService) Login(loginDTO dto.LoginDTO) (string, error) {
 
 	// Generate JWT
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": user.ID,
+		"user_id": user.ID.String(),
 		"email":   user.Email,
 		"exp":     time.Now().Add(time.Hour * 12).Unix(),
 	})

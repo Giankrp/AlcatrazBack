@@ -1,13 +1,17 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Session struct {
-	ID        string  `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID    string  `gorm:"index;not null"`
-	DeviceID  *string `gorm:"index"`
-	IP        string
-	UserAgent string
-	ExpiresAt time.Time `gorm:"index"`
-	CreatedAt time.Time
+	ID        uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID    uuid.UUID `gorm:"type:uuid;index;not null" json:"user_id"`
+	DeviceID  *string   `gorm:"index" json:"device_id"`
+	IP        string    `json:"ip"`
+	UserAgent string    `json:"user_agent"`
+	ExpiresAt time.Time `gorm:"index" json:"expires_at"`
+	CreatedAt time.Time `json:"created_at"`
 }

@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 )
 
@@ -16,37 +17,37 @@ const (
 )
 
 type VaultItem struct {
-	ID       string        `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID   string        `gorm:"index;not null"`
-	User     User          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;"`
-	FolderID *string       `gorm:"index"`
-	ItemType VaultItemType `gorm:"column:item_type;not null;index"`
+	ID       uuid.UUID     `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	UserID   uuid.UUID     `gorm:"type:uuid;index;not null" json:"user_id"`
+	User     User          `gorm:"foreignKey:UserID;constraint:OnDelete:CASCADE;" json:"-"`
+	FolderID *uuid.UUID    `gorm:"type:uuid;index" json:"folder_id"`
+	ItemType VaultItemType `gorm:"column:item_type;not null;index" json:"item_type"`
 
 	// BaseVaultItem (Visible/Metadata)
-	Title   string `gorm:"not null"`
-	Icon    string `gorm:"default:'default_icon'"`
-	Trashed bool   `gorm:"default:false;index"`
+	Title   string `gorm:"not null" json:"title"`
+	Icon    string `gorm:"default:'default_icon'" json:"icon"`
+	Trashed bool   `gorm:"default:false;index" json:"trashed"`
 
 	// Relation
-	Secret *VaultSecret `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"` // HasOne relation
+	Secret *VaultSecret `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"secret,omitempty"` // HasOne relation
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time `gorm:"index"` // Soft delete
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
+	DeletedAt *time.Time `gorm:"index" json:"-"` // Soft delete hidden from JSON usually
 }
 
 // VaultSecret holds the heavy encrypted data.
 // It is separated to allow list queries without loading this blob.
 type VaultSecret struct {
-	VaultItemID string `gorm:"primaryKey"` // Uses the same ID as VaultItem for 1:1
+	VaultItemID uuid.UUID `gorm:"type:uuid;primaryKey" json:"vault_item_id"` // Uses the same ID as VaultItem for 1:1
 
 	// Specific Data (Encrypted)
 	// Serialized JSON of specific item data (PasswordItem, NoteItem, etc.)
-	EncryptedData string `gorm:"not null"`
+	EncryptedData string `gorm:"not null" json:"encrypted_data"`
 
 	// Encryption Metadata
-	IV   string `gorm:"not null"`
-	Salt string `gorm:"not null"`
+	IV   string `gorm:"not null" json:"iv"`
+	Salt string `gorm:"not null" json:"salt"`
 }
 
 // Estructura auxiliar para guardar datos adicionales NO cifrados si fuera necesario (ej. tags)

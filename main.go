@@ -61,7 +61,7 @@ func main() {
 	vaultRepo := repositories.NewVaultRepository(database)
 
 	// Services
-	authService := services.NewAuthService(userRepo)
+	authService := services.NewAuthService(userRepo, vaultRepo)
 	vaultService := services.NewVaultService(vaultRepo)
 	userService := services.NewUserService(userRepo)
 

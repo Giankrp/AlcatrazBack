@@ -7,6 +7,7 @@ import (
 	"github.com/Giankrp/AlcatrazBack/models"
 	"github.com/Giankrp/AlcatrazBack/services"
 	"github.com/Giankrp/AlcatrazBack/validator"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -20,7 +21,7 @@ func NewUserProfileHandler(userProfileService services.UserService) *UserProfile
 
 func (u *UserProfileHandler) GetProfile(c echo.Context) error {
 	userID := getUserIDFromToken(c)
-	if userID == "" {
+	if userID == uuid.Nil {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "Unauthorized"})
 	}
 
@@ -37,7 +38,7 @@ func (u *UserProfileHandler) UpdateProfile(c echo.Context) error {
 
 	userID := getUserIDFromToken(c)
 
-	if userID == "" {
+	if userID == uuid.Nil {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "Unauthorized"})
 	}
 	if err := c.Bind(&update); err != nil {

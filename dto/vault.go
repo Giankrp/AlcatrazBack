@@ -1,5 +1,9 @@
 package dto
 
+import (
+	"github.com/google/uuid"
+)
+
 type VaultItemType string
 
 const (
@@ -10,7 +14,7 @@ const (
 )
 
 type CreateVaultItemDTO struct {
-	FolderID *string       `json:"folder_id"`
+	FolderID *uuid.UUID    `json:"folder_id"`
 	ItemType VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
 	Title    string        `json:"title" validate:"required"`
 	Icon     string        `json:"icon"`
@@ -25,7 +29,7 @@ type Secret struct {
 	Salt string `json:"salt" validate:"required"`
 }
 type UpdateVaultItemDTO struct {
-	FolderID *string       `json:"folder_id"`
+	FolderID *uuid.UUID    `json:"folder_id"`
 	ItemType VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
 	Title    string        `json:"title"`
 	Icon     string        `json:"icon"`
@@ -34,5 +38,10 @@ type UpdateVaultItemDTO struct {
 }
 
 type CreateVaultFolderDTO struct {
+	Name      string `json:"name" validate:"required"`
+	IsDefault bool   `json:"is_default"` // Usually false when created via API, but good to have
+}
+
+type UpdateVaultFolderDTO struct {
 	Name string `json:"name" validate:"required"`
 }
