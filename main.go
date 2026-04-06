@@ -11,16 +11,23 @@ import (
 	"github.com/Giankrp/AlcatrazBack/routes"
 	"github.com/Giankrp/AlcatrazBack/services"
 
+	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
+func init() {
+	// Setup charmbracelet/log for nice debugging output
+	log.SetLevel(log.DebugLevel)
+	log.SetReportCaller(true)
+}
+
 func main() {
 	// 1. Initialize Echo
 	e := echo.New()
 	if err := godotenv.Load(); err != nil {
-		e.Logger.Warn("Error loading .env file")
+		log.Warn("Error loading .env file, relying on environment variables")
 	}
 
 	// 2. Middleware
@@ -31,9 +38,10 @@ func main() {
 	var allowedOrigins []string
 	if allowedOriginsEnv != "" {
 		allowedOrigins = strings.Split(allowedOriginsEnv, ",")
+		log.Debug("Allowed origins configured", "origins", allowedOrigins)
 	} else {
 		allowedOrigins = []string{"http://localhost:3000"} // Fallback as warning or strictly to be defined
-		e.Logger.Warn("ALLOWED_ORIGINS is not set. Defaulting to '*' which is insecure for production.")
+		log.Warn("ALLOWED_ORIGINS is not set. Defaulting to '*' which is insecure for production.")
 	}
 
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
@@ -45,15 +53,19 @@ func main() {
 	e.HTTPErrorHandler = customHTTPErrorHandler
 
 	// 4. Database Connection
+	log.Info("Connecting to database...")
 	database, err := db.NewConnection()
 	if err != nil {
-		e.Logger.Fatal("Error connecting to database: ", err)
+		log.Fatal("Error connecting to database", "error", err)
 	}
+	log.Info("Successfully connected to database")
 
 	// 5. Database Migration
+	log.Info("Running database migrations...")
 	if err := db.AutoMigrate(database); err != nil {
-		e.Logger.Fatal("Error migrating database: ", err)
+		log.Fatal("Error migrating database", "error", err)
 	}
+	log.Info("Database migrations completed")
 
 	// 6. Dependency Injection (Wiring)
 	// Repositories
@@ -78,7 +90,8 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	e.Logger.Fatal(e.Start(":" + port))
+	log.Infof("Starting server on port %s", port)
+	log.Fatal("Server stopped", "error", e.Start(":"+port))
 }
 
 func customHTTPErrorHandler(err error, c echo.Context) {
@@ -90,6 +103,9 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 		message = he.Message.(string)
 	}
 
+	// Log the actual error for debugging
+	log.Error("HTTP Error", "method", c.Request().Method, "path", c.Request().URL.Path, "status", code, "error", err.Error())
+
 	// Send JSON response
 	if !c.Response().Committed {
 		if c.Request().Method == http.MethodHead {
@@ -98,7 +114,7 @@ func customHTTPErrorHandler(err error, c echo.Context) {
 			err = c.JSON(code, echo.Map{"error": message})
 		}
 		if err != nil {
-			c.Logger().Error(err)
+			log.Error("Error sending error response", "error", err)
 		}
 	}
 }

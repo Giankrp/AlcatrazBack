@@ -40,6 +40,9 @@ func (h *VaultHandler) CreateItem(c echo.Context) error {
 
 	item, err := h.service.CreateItem(userID, input)
 	if err != nil {
+		if err.Error() == "folder not found or unauthorized" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create item"})
 	}
 
@@ -95,6 +98,9 @@ func (h *VaultHandler) UpdateItem(c echo.Context) error {
 
 	item, err := h.service.UpdateItem(userID, itemID, input)
 	if err != nil {
+		if err.Error() == "folder not found or unauthorized" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to update item"})
 	}
 
@@ -137,6 +143,9 @@ func (h *VaultHandler) CreateFolder(c echo.Context) error {
 
 	folder, err := h.service.CreateFolder(userID, input)
 	if err != nil {
+		if err.Error() == "a folder with this name already exists" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to create folder"})
 	}
 

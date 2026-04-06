@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/Giankrp/AlcatrazBack/dto"
 	"github.com/Giankrp/AlcatrazBack/models"
@@ -45,7 +46,7 @@ func (s *vaultService) CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO
 		// Validate that folder belongs to user
 		_, err := s.repo.FindFolderByID(*input.FolderID, userID)
 		if err != nil {
-			return nil, errors.New("invalid folder ID or unauthorized")
+			return nil, errors.New("folder not found or unauthorized")
 		}
 		folderID = input.FolderID
 	}
@@ -87,7 +88,7 @@ func (s *vaultService) UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.
 		// Validate that folder belongs to user
 		_, err := s.repo.FindFolderByID(*input.FolderID, userID)
 		if err != nil {
-			return nil, errors.New("invalid folder ID or unauthorized")
+			return nil, errors.New("folder not found or unauthorized")
 		}
 		item.FolderID = input.FolderID
 	}
@@ -146,6 +147,9 @@ func (s *vaultService) CreateFolder(userID uuid.UUID, input dto.CreateVaultFolde
 	}
 
 	if err := s.repo.CreateFolder(folder); err != nil {
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			return nil, errors.New("a folder with this name already exists")
+		}
 		return nil, err
 	}
 	return folder, nil
