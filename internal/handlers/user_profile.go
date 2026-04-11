@@ -3,10 +3,10 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Giankrp/AlcatrazBack/dto"
-	"github.com/Giankrp/AlcatrazBack/models"
-	"github.com/Giankrp/AlcatrazBack/services"
-	"github.com/Giankrp/AlcatrazBack/validator"
+	"github.com/Giankrp/AlcatrazBack/internal/dto"
+	"github.com/Giankrp/AlcatrazBack/internal/models"
+	"github.com/Giankrp/AlcatrazBack/internal/services"
+	"github.com/Giankrp/AlcatrazBack/internal/validator"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
@@ -30,7 +30,15 @@ func (u *UserProfileHandler) GetProfile(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, echo.Map{"error": "Profile not found"})
 	}
 
-	return c.JSON(http.StatusOK, profile)
+	return c.JSON(http.StatusOK, echo.Map{
+		"user_id":            profile.UserID,
+		"name":               profile.Name,
+		"avatar_url":         profile.AvatarURL,
+		"language":           profile.Language,
+		"created_at":         profile.CreatedAt,
+		"updated_at":         profile.UpdatedAt,
+		"two_factor_enabled": profile.User.TwoFactorEnabled,
+	})
 }
 
 func (u *UserProfileHandler) UpdateProfile(c echo.Context) error {

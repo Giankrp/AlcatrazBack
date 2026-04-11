@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"github.com/Giankrp/AlcatrazBack/models"
+	"github.com/Giankrp/AlcatrazBack/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -12,6 +12,8 @@ type UserRepository interface {
 	CreateProfile(profile *models.UserProfile) error
 	FindProfileByUserID(userID uuid.UUID) (*models.UserProfile, error)
 	UpdateProfile(profile *models.UserProfile) error
+	FindByID(id uuid.UUID) (*models.User, error)
+	Update(user *models.User) error
 }
 
 type userRepository struct {
@@ -40,7 +42,7 @@ func (r *userRepository) CreateProfile(profile *models.UserProfile) error {
 
 func (r *userRepository) FindProfileByUserID(userID uuid.UUID) (*models.UserProfile, error) {
 	var profile models.UserProfile
-	if err := r.db.Where("user_id = ?", userID).First(&profile).Error; err != nil {
+	if err := r.db.Preload("User").Where("user_id = ?", userID).First(&profile).Error; err != nil {
 		return nil, err
 	}
 	return &profile, nil
@@ -48,4 +50,16 @@ func (r *userRepository) FindProfileByUserID(userID uuid.UUID) (*models.UserProf
 
 func (r *userRepository) UpdateProfile(profile *models.UserProfile) error {
 	return r.db.Save(profile).Error
+}
+
+func (r *userRepository) FindByID(id uuid.UUID) (*models.User, error) {
+	var user models.User
+	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (r *userRepository) Update(user *models.User) error {
+	return r.db.Save(user).Error
 }

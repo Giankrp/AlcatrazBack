@@ -1,7 +1,7 @@
 package repositories
 
 import (
-	"github.com/Giankrp/AlcatrazBack/models"
+	"github.com/Giankrp/AlcatrazBack/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

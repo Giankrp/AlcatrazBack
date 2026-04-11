@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"github.com/Giankrp/AlcatrazBack/dto"
-	"github.com/Giankrp/AlcatrazBack/services"
+	"github.com/Giankrp/AlcatrazBack/internal/dto"
+	"github.com/Giankrp/AlcatrazBack/internal/services"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/golang-jwt/jwt/v5"

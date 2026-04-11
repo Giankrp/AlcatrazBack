@@ -4,9 +4,9 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/Giankrp/AlcatrazBack/dto"
-	"github.com/Giankrp/AlcatrazBack/models"
-	"github.com/Giankrp/AlcatrazBack/repositories"
+	"github.com/Giankrp/AlcatrazBack/internal/dto"
+	"github.com/Giankrp/AlcatrazBack/internal/models"
+	"github.com/Giankrp/AlcatrazBack/internal/repositories"
 	"github.com/google/uuid"
 )
 

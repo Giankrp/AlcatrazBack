@@ -2,12 +2,15 @@ package handlers
 
 import (
 	"net/http"
+	"os"
 	"time"
 
-	"github.com/Giankrp/AlcatrazBack/dto"
-	"github.com/Giankrp/AlcatrazBack/services"
-	"github.com/Giankrp/AlcatrazBack/validator"
+	"github.com/Giankrp/AlcatrazBack/internal/dto"
+	"github.com/Giankrp/AlcatrazBack/internal/services"
+	"github.com/Giankrp/AlcatrazBack/internal/validator"
 	"github.com/charmbracelet/log"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
@@ -59,7 +62,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	log.Debug("Login attempt", "email", login.Email)
-	token, err := h.authService.Login(login)
+	loginRes, err := h.authService.Login(login)
 	if err != nil {
 		log.Warn("Login failed", "error", err, "email", login.Email)
 		if err.Error() == "invalid credentials" {
@@ -68,10 +71,18 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
 	}
 
+	if loginRes.Require2FA {
+		log.Info("Login requires 2FA", "email", login.Email)
+		return c.JSON(http.StatusOK, echo.Map{
+			"require_2fa": true,
+			"temp_token":  loginRes.Token,
+		})
+	}
+
 	// Set JWT as HttpOnly cookie
 	cookie := &http.Cookie{
 		Name:     "auth_token",
-		Value:    token,
+		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   false,
@@ -81,6 +92,90 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	c.SetCookie(cookie)
 
 	log.Info("Login successful", "email", login.Email)
+	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+}
+
+func (h *AuthHandler) Setup2FA(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userIDStr := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
+	res, err := h.authService.Generate2FASecret(userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "failed to generate 2FA secret"})
+	}
+
+	return c.JSON(http.StatusOK, res)
+}
+
+func (h *AuthHandler) Enable2FA(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userIDStr := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
+	var enableDTO dto.Enable2FADTO
+	if err := c.Bind(&enableDTO); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	backupCodes, err := h.authService.Enable2FA(userID, enableDTO)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"message":      "2FA enabled successfully",
+		"backup_codes": backupCodes,
+	})
+}
+
+func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
+	var verify dto.Verify2FADTO
+	if err := c.Bind(&verify); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	tempToken := c.Request().Header.Get("X-Temp-Token")
+	if tempToken == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "missing temporary token"})
+	}
+
+	// Parse temp token
+	token, err := jwt.Parse(tempToken, func(token *jwt.Token) (any, error) {
+		return []byte(os.Getenv("JWT_SECRET")), nil
+	})
+
+	if err != nil || !token.Valid {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid or expired temporary token"})
+	}
+
+	claims := token.Claims.(jwt.MapClaims)
+	if claims["pending_2fa"] != true {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid token type"})
+	}
+
+	userIDStr := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
+	finalToken, err := h.authService.Verify2FALogin(userID, verify.Code)
+	if err != nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+	}
+
+	// Set final JWT as HttpOnly cookie
+	cookie := &http.Cookie{
+		Name:     "auth_token",
+		Value:    finalToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   60 * 60 * 12, // 12 hours
+	}
+	c.SetCookie(cookie)
+
 	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
 }
 
