@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Giankrp/AlcatrazBack/db"
-	"github.com/Giankrp/AlcatrazBack/handlers"
-	"github.com/Giankrp/AlcatrazBack/repositories"
-	"github.com/Giankrp/AlcatrazBack/routes"
-	"github.com/Giankrp/AlcatrazBack/services"
+	"github.com/Giankrp/AlcatrazBack/internal/db"
+	"github.com/Giankrp/AlcatrazBack/internal/handlers"
+	"github.com/Giankrp/AlcatrazBack/internal/repositories"
+	"github.com/Giankrp/AlcatrazBack/internal/routes"
+	"github.com/Giankrp/AlcatrazBack/internal/services"
 
 	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"

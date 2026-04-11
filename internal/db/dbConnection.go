@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	"github.com/Giankrp/AlcatrazBack/models"
+	"github.com/Giankrp/AlcatrazBack/internal/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
