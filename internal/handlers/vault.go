@@ -6,16 +6,18 @@ import (
 	"github.com/Giankrp/AlcatrazBack/internal/dto"
 	"github.com/Giankrp/AlcatrazBack/internal/services"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
+// VaultHandler manages HTTP requests for vault handling (items and folders).
 type VaultHandler struct {
 	service   services.VaultService
 	validator *validator.Validate
 }
 
+// NewVaultHandler creates a new instance of the vault controller.
 func NewVaultHandler(service services.VaultService) *VaultHandler {
 	return &VaultHandler{
 		service:   service,
@@ -210,9 +212,9 @@ func (h *VaultHandler) DeleteFolder(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// Helper para extraer ID del token JWT
+// getUserIDFromToken is a helper to extract the user ID from the JWT token.
 func getUserIDFromToken(c echo.Context) uuid.UUID {
-	// Verificar si el contexto tiene el usuario
+	// Check if the context has the user
 	userToken, ok := c.Get("user").(*jwt.Token)
 	if !ok || userToken == nil {
 		return uuid.Nil

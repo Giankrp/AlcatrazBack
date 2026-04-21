@@ -10,18 +10,33 @@ import (
 	"github.com/google/uuid"
 )
 
+// VaultService manages the business logic for vault items and folders.
 type VaultService interface {
-	// Items
+	// CreateItem creates a new encrypted item in the user's vault.
 	CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO) (*models.VaultItem, error)
+
+	// GetItems returns all visible vault items for a user.
 	GetItems(userID uuid.UUID) ([]models.VaultItem, error)
+
+	// GetItem returns a specific vault item.
 	GetItem(userID uuid.UUID, itemID uuid.UUID) (*models.VaultItem, error)
+
+	// UpdateItem updates metadata or encrypted content of an item.
 	UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.UpdateVaultItemDTO) (*models.VaultItem, error)
+
+	// DeleteItem permanently deletes a vault item.
 	DeleteItem(userID uuid.UUID, itemID uuid.UUID) error
 
-	// Folders
+	// CreateFolder creates a new folder for organizing items.
 	CreateFolder(userID uuid.UUID, input dto.CreateVaultFolderDTO) (*models.VaultFolder, error)
+
+	// GetFolders lists all folders belonging to a user.
 	GetFolders(userID uuid.UUID) ([]models.VaultFolder, error)
+
+	// UpdateFolder modifies folder metadata like its name.
 	UpdateFolder(userID uuid.UUID, folderID uuid.UUID, input dto.UpdateVaultFolderDTO) (*models.VaultFolder, error)
+
+	// DeleteFolder deletes a folder and reassigns its items to the default folder.
 	DeleteFolder(userID uuid.UUID, folderID uuid.UUID) error
 }
 

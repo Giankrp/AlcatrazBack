@@ -18,13 +18,28 @@ import (
 	"gorm.io/gorm"
 )
 
+// AuthService manages authentication, registration, and user security (2FA/MasterKey).
 type AuthService interface {
+	// Register creates a new user with their encrypted MasterKey.
 	Register(registerDTO dto.RegisterDTO) error
+
+	// Login verifies credentials and returns the MasterKey if successful.
 	Login(loginDTO dto.LoginDTO) (*dto.LoginResponseDTO, error)
+
+	// UserExists checks if an email is already registered in the system.
 	UserExists(email string) (bool, error)
+
+	// Generate2FASecret generates a new seed for two-factor authentication.
 	Generate2FASecret(userID uuid.UUID) (*dto.Setup2FAResponseDTO, error)
+
+	// Enable2FA activates two-factor authentication for a user.
 	Enable2FA(userID uuid.UUID, enableDTO dto.Enable2FADTO) ([]string, error)
+
+	// Verify2FALogin validates the 2FA code during login.
 	Verify2FALogin(userID uuid.UUID, code string) (string, error)
+
+	// ChangeMasterPassword atomically updates the password and the protected MasterKey.
+	ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMasterPasswordDTO) error
 }
 
 type authService struct {
@@ -54,9 +69,12 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	name := strings.Split(registerDTO.Email, "@")[0]
 
 	user := &models.User{
-		Email:        registerDTO.Email,
-		PasswordHash: hashedPassword,
-		CreatedAt:    time.Now(),
+		Email:              registerDTO.Email,
+		PasswordHash:       hashedPassword,
+		ProtectedMasterKey: registerDTO.ProtectedMasterKey,
+		MasterKeyIV:        registerDTO.MasterKeyIV,
+		MasterKeySalt:      registerDTO.MasterKeySalt,
+		CreatedAt:          time.Now(),
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
@@ -124,8 +142,11 @@ func (s *authService) Login(loginDTO dto.LoginDTO) (*dto.LoginResponseDTO, error
 	}
 
 	return &dto.LoginResponseDTO{
-		Require2FA: false,
-		Token:      tokenString,
+		Require2FA:         false,
+		Token:              tokenString,
+		ProtectedMasterKey: user.ProtectedMasterKey,
+		MasterKeyIV:        user.MasterKeyIV,
+		MasterKeySalt:      user.MasterKeySalt,
 	}, nil
 }
 
@@ -177,7 +198,7 @@ func (s *authService) Enable2FA(userID uuid.UUID, enableDTO dto.Enable2FADTO) ([
 
 	// Generate 8 backup codes
 	backupCodes := make([]string, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		code, err := security.GenerateRandomString(8)
 		if err != nil {
 			return nil, err
@@ -248,4 +269,34 @@ func (s *authService) UserExists(email string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *authService) ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMasterPasswordDTO) error {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	// 1. Verify old password
+	match, err := security.VerifyPassword(input.OldPassword, user.PasswordHash)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return errors.New("invalid current password")
+	}
+
+	// 2. Hash new password
+	newPasswordHash, err := security.HashPassword(input.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	// 3. Update all security metadata
+	user.PasswordHash = newPasswordHash
+	user.ProtectedMasterKey = input.ProtectedMasterKey
+	user.MasterKeyIV = input.MasterKeyIV
+	user.MasterKeySalt = input.MasterKeySalt
+
+	return s.userRepo.Update(user)
 }

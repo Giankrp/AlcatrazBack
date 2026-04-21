@@ -1,3 +1,4 @@
+// Package models contains the data models for the alcatraz database.
 package models
 
 import (
@@ -42,20 +43,20 @@ type VaultSecret struct {
 	VaultItemID uuid.UUID `gorm:"type:uuid;primaryKey" json:"vault_item_id"` // Uses the same ID as VaultItem for 1:1
 
 	// Specific Data (Encrypted)
-	// Serialized JSON of specific item data (PasswordItem, NoteItem, etc.)
+	// Serialized JSON encrypted with the user's Master Key.
 	EncryptedData string `gorm:"not null" json:"encrypted_data"`
 
 	// Encryption Metadata
-	IV   string `gorm:"not null" json:"iv"`
-	Salt string `gorm:"not null" json:"salt"`
+	IV   string `gorm:"not null" json:"iv"`   // Unique IV per item.
+	Salt string `gorm:"not null" json:"salt"` // Optional Salt used to derive per-item keys from the Master Key.
 }
 
-// Estructura auxiliar para guardar datos adicionales NO cifrados si fuera necesario (ej. tags)
+// VaultItemMeta is an auxiliary structure to store non-encrypted additional data (e.g., tags).
 type VaultItemMeta struct {
 	Tags []string `json:"tags"`
 }
 
-// Si en el futuro quisieras guardar parte de la data como JSONB consultable (NO cifrado):
+// VaultItemPublicData represents data as queryable JSONB (NOT encrypted).
 type VaultItemPublicData struct {
 	Data datatypes.JSON `gorm:"type:jsonb"`
 }

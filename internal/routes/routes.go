@@ -38,6 +38,7 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	user := protected.Group("/user")
 	user.GET("/profile", userProfileHandler.GetProfile)
 	user.PUT("/profile", userProfileHandler.UpdateProfile)
+	user.POST("/change-password", authHandler.ChangeMasterPassword)
 	user.POST("/2fa/setup", authHandler.Setup2FA)
 	user.POST("/2fa/enable", authHandler.Enable2FA)
 

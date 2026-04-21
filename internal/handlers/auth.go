@@ -14,14 +14,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// AuthHandler manages HTTP requests related to authentication and user management.
 type AuthHandler struct {
 	authService services.AuthService
 }
 
+// NewAuthHandler creates a new instance of the authentication controller.
 func NewAuthHandler(authService services.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
+// Register handles the creation of new users.
 func (h *AuthHandler) Register(c echo.Context) error {
 	var register dto.RegisterDTO
 	if err := c.Bind(&register); err != nil {
@@ -36,8 +39,6 @@ func (h *AuthHandler) Register(c echo.Context) error {
 
 	log.Debug("Register attempt", "email", register.Email)
 	if err := h.authService.Register(register); err != nil {
-		// En un caso real, chequear tipo de error para devolver 409 Conflict si ya existe, etc.
-		// Por simplicidad, 400 o 500 según corresponda.
 		log.Warn("Registration failed", "error", err, "email", register.Email)
 		if err.Error() == "email already registered" {
 			return c.JSON(http.StatusConflict, echo.Map{"error": err.Error()})
@@ -92,7 +93,37 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	c.SetCookie(cookie)
 
 	log.Info("Login successful", "email", login.Email)
-	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+	return c.JSON(http.StatusOK, echo.Map{
+		"message":              "login successful",
+		"protected_master_key": loginRes.ProtectedMasterKey,
+		"master_key_iv":        loginRes.MasterKeyIV,
+		"master_key_salt":      loginRes.MasterKeySalt,
+	})
+}
+
+func (h *AuthHandler) ChangeMasterPassword(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userIDStr := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
+	var input dto.ChangeMasterPasswordDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	if err := h.authService.ChangeMasterPassword(userID, input); err != nil {
+		if err.Error() == "invalid current password" {
+			return c.JSON(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "master password updated successfully"})
 }
 
 func (h *AuthHandler) Setup2FA(c echo.Context) error {
