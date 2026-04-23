@@ -14,10 +14,11 @@ const (
 )
 
 type CreateVaultItemDTO struct {
-	FolderID *uuid.UUID    `json:"folder_id"`
-	ItemType VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
-	Title    string        `json:"title" validate:"required"`
-	Icon     string        `json:"icon"`
+	FolderID      *uuid.UUID    `json:"folder_id"`
+	ItemType      VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
+	Title         string        `json:"title" validate:"required"`
+	Icon          string        `json:"icon"`
+	SecurityScore *int          `json:"security_score" validate:"omitempty,min=0,max=100"`
 
 	// Encrypted Blob (JSON stringificado y cifrado)
 	Secret Secret `json:"secret" validate:"required"`
@@ -29,12 +30,13 @@ type Secret struct {
 	Salt string `json:"salt" validate:"required"`
 }
 type UpdateVaultItemDTO struct {
-	FolderID *uuid.UUID    `json:"folder_id"`
-	ItemType VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
-	Title    string        `json:"title"`
-	Icon     string        `json:"icon"`
-	Trashed  *bool         `json:"trashed"`
-	Secret   Secret        `json:"secret" validate:"required"`
+	FolderID      *uuid.UUID    `json:"folder_id"`
+	ItemType      VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
+	Title         string        `json:"title"`
+	Icon          string        `json:"icon"`
+	Trashed       *bool         `json:"trashed"`
+	SecurityScore *int          `json:"security_score" validate:"omitempty,min=0,max=100"`
+	Secret        Secret        `json:"secret" validate:"required"`
 }
 
 type CreateVaultFolderDTO struct {

@@ -63,6 +63,18 @@ func (h *VaultHandler) GetItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+func (h *VaultHandler) GetTrash(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	items, err := h.service.GetTrashedItems(userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch trash items"})
+	}
+	return c.JSON(http.StatusOK, items)
+}
+
 func (h *VaultHandler) GetItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -109,6 +121,40 @@ func (h *VaultHandler) UpdateItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
+func (h *VaultHandler) MoveToTrash(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
+	}
+
+	if err := h.service.MoveToTrash(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to move item to trash"})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *VaultHandler) RestoreItem(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
+	}
+
+	if err := h.service.RestoreFromTrash(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to restore item"})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *VaultHandler) DeleteItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -119,8 +165,8 @@ func (h *VaultHandler) DeleteItem(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
 	}
 
-	if err := h.service.DeleteItem(userID, itemID); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete item"})
+	if err := h.service.PermanentlyDelete(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete item permanently"})
 	}
 
 	return c.NoContent(http.StatusNoContent)

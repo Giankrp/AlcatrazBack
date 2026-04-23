@@ -41,14 +41,18 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	user.POST("/change-password", authHandler.ChangeMasterPassword)
 	user.POST("/2fa/setup", authHandler.Setup2FA)
 	user.POST("/2fa/enable", authHandler.Enable2FA)
+	user.DELETE("/account", userProfileHandler.DeleteAccount)
 
 	// Vault routes
 	vault := protected.Group("/vault")
 	vault.POST("/items", vaultHandler.CreateItem)
 	vault.GET("/items", vaultHandler.GetItems)
+	vault.GET("/trash", vaultHandler.GetTrash)
 	vault.GET("/items/:id", vaultHandler.GetItem)
 	vault.PUT("/items/:id", vaultHandler.UpdateItem)
-	vault.DELETE("/items/:id", vaultHandler.DeleteItem)
+	vault.DELETE("/items/:id", vaultHandler.MoveToTrash)
+	vault.POST("/items/:id/restore", vaultHandler.RestoreItem)
+	vault.DELETE("/items/:id/permanent", vaultHandler.DeleteItem)
 
 	// Folder routes
 	vault.POST("/folders", vaultHandler.CreateFolder)

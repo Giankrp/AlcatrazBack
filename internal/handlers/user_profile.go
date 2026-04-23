@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"os"
+	"time"
 
 	"github.com/Giankrp/AlcatrazBack/internal/dto"
 	"github.com/Giankrp/AlcatrazBack/internal/models"
@@ -74,4 +76,31 @@ func (u *UserProfileHandler) UpdateProfile(c echo.Context) error {
 	u.userProfileService.UpdateProfile(&profile)
 	return c.JSON(http.StatusOK, echo.Map{"Message": "User updated"})
 
+}
+
+func (u *UserProfileHandler) DeleteAccount(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, echo.Map{"error": "Unauthorized"})
+	}
+
+	if err := u.userProfileService.DeleteAccount(userID); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to delete account"})
+	}
+
+	// Delete cookie (logout)
+	isProd := os.Getenv("ENV") == "production"
+	cookie := &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Unix(0, 0),
+		MaxAge:   -1,
+	}
+	c.SetCookie(cookie)
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "Account successfully deleted"})
 }

@@ -25,9 +25,10 @@ type VaultItem struct {
 	ItemType VaultItemType `gorm:"column:item_type;not null;index" json:"item_type"`
 
 	// BaseVaultItem (Visible/Metadata)
-	Title   string `gorm:"not null" json:"title"`
-	Icon    string `gorm:"default:'default_icon'" json:"icon"`
-	Trashed bool   `gorm:"default:false;index" json:"trashed"`
+	Title         string `gorm:"not null" json:"title"`
+	Icon          string `gorm:"default:'default_icon'" json:"icon"`
+	Trashed       bool   `gorm:"default:false;index" json:"trashed"`
+	SecurityScore *int   `gorm:"index" json:"security_score"`
 
 	// Relation
 	Secret *VaultSecret `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;" json:"secret,omitempty"` // HasOne relation

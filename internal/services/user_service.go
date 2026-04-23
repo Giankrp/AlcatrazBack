@@ -9,6 +9,7 @@ import (
 type UserService interface {
 	GetProfile(userID uuid.UUID) (*models.UserProfile, error)
 	UpdateProfile(profile *models.UserProfile) error
+	DeleteAccount(userID uuid.UUID) error
 }
 
 type userService struct {
@@ -26,4 +27,8 @@ func (s *userService) GetProfile(userID uuid.UUID) (*models.UserProfile, error) 
 func (s *userService) UpdateProfile(profile *models.UserProfile) error {
 
 	return s.userRepo.UpdateProfile(profile)
+}
+
+func (s *userService) DeleteAccount(userID uuid.UUID) error {
+	return s.userRepo.Delete(userID)
 }

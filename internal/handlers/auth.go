@@ -81,12 +81,13 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Set JWT as HttpOnly cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
@@ -190,35 +191,42 @@ func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
 	userIDStr := claims["user_id"].(string)
 	userID, _ := uuid.Parse(userIDStr)
 
-	finalToken, err := h.authService.Verify2FALogin(userID, verify.Code)
+	loginRes, err := h.authService.Verify2FALogin(userID, verify.Code)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": err.Error()})
 	}
 
 	// Set final JWT as HttpOnly cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
-		Value:    finalToken,
+		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
 
-	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+	return c.JSON(http.StatusOK, echo.Map{
+		"message":              "login successful",
+		"protected_master_key": loginRes.ProtectedMasterKey,
+		"master_key_iv":        loginRes.MasterKeyIV,
+		"master_key_salt":      loginRes.MasterKeySalt,
+	})
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
 	log.Debug("Logout attempt")
 	// Expire the auth cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
