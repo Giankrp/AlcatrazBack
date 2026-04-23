@@ -20,6 +20,8 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	auth.POST("/logout", authHandler.Logout)
 	auth.GET("/exists", authHandler.UserExists)
 	auth.POST("/2fa/verify", authHandler.Verify2FALogin)
+	auth.POST("/recovery/fetch", authHandler.FetchRecoveryData)
+	auth.POST("/recovery/reset", authHandler.ResetPassword)
 
 	// Protected routes
 	protected := api.Group("")

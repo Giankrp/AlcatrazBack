@@ -253,3 +253,50 @@ func (h *AuthHandler) UserExists(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, echo.Map{"exists": exists})
 }
+
+func (h *AuthHandler) FetchRecoveryData(c echo.Context) error {
+	var input dto.FetchRecoveryDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	user, err := h.authService.FetchRecoveryData(input.Email)
+	if err != nil {
+		if err.Error() == "user not found" {
+			// To prevent email enumeration during recovery, we could return 200 with fake data,
+			// but for a TFG, returning 404 or a generic message is acceptable.
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user not found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"recovery_protected_master_key": user.RecoveryProtectedMasterKey,
+		"recovery_key_iv":               user.RecoveryKeyIV,
+		"recovery_key_salt":             user.RecoveryKeySalt,
+	})
+}
+
+func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	var input dto.ResetPasswordDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	if err := h.authService.ResetPasswordWithRecoveryKey(input); err != nil {
+		if err.Error() == "user not found" || err.Error() == "invalid recovery key" {
+			return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid recovery key or email"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "password reset successfully"})
+}

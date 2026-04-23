@@ -40,6 +40,12 @@ type AuthService interface {
 
 	// ChangeMasterPassword atomically updates the password and the protected MasterKey.
 	ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMasterPasswordDTO) error
+
+	// FetchRecoveryData returns the recovery block for a given email.
+	FetchRecoveryData(email string) (*models.User, error)
+
+	// ResetPasswordWithRecoveryKey validates the RK and updates the MK.
+	ResetPasswordWithRecoveryKey(input dto.ResetPasswordDTO) error
 }
 
 type authService struct {
@@ -66,14 +72,25 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	if err != nil {
 		return err
 	}
+	
+	// Hash recovery key
+	hashedRecoveryKey, err := security.HashPassword(registerDTO.RecoveryKey)
+	if err != nil {
+		return err
+	}
+
 	name := strings.Split(registerDTO.Email, "@")[0]
 
 	user := &models.User{
 		Email:              registerDTO.Email,
 		PasswordHash:       hashedPassword,
+		RecoveryKeyHash:    hashedRecoveryKey,
 		ProtectedMasterKey: registerDTO.ProtectedMasterKey,
 		MasterKeyIV:        registerDTO.MasterKeyIV,
 		MasterKeySalt:      registerDTO.MasterKeySalt,
+		RecoveryProtectedMasterKey: registerDTO.RecoveryProtectedMasterKey,
+		RecoveryKeyIV:              registerDTO.RecoveryKeyIV,
+		RecoveryKeySalt:            registerDTO.RecoveryKeySalt,
 		CreatedAt:          time.Now(),
 	}
 
@@ -308,6 +325,53 @@ func (s *authService) ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMas
 	user.ProtectedMasterKey = input.ProtectedMasterKey
 	user.MasterKeyIV = input.MasterKeyIV
 	user.MasterKeySalt = input.MasterKeySalt
+
+	return s.userRepo.Update(user)
+}
+
+func (s *authService) FetchRecoveryData(email string) (*models.User, error) {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *authService) ResetPasswordWithRecoveryKey(input dto.ResetPasswordDTO) error {
+	user, err := s.userRepo.FindByEmail(input.Email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
+		return err
+	}
+
+	// 1. Verify Recovery Key
+	match, err := security.VerifyPassword(input.RecoveryKey, user.RecoveryKeyHash)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return errors.New("invalid recovery key")
+	}
+
+	// 2. Hash new password
+	newPasswordHash, err := security.HashPassword(input.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	// 3. Update security metadata
+	user.PasswordHash = newPasswordHash
+	user.ProtectedMasterKey = input.ProtectedMasterKey
+	user.MasterKeyIV = input.MasterKeyIV
+	user.MasterKeySalt = input.MasterKeySalt
+
+	// Note: We don't change the Recovery key or its encrypted block here.
+	// The RK stays the same for the lifetime of the account unless explicitly rotated.
 
 	return s.userRepo.Update(user)
 }

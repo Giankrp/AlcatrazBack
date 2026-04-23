@@ -3,9 +3,13 @@ package dto
 type RegisterDTO struct {
 	Email              string `json:"email" validate:"required,email"`
 	Password           string `json:"password" validate:"required,min=8"`
-	ProtectedMasterKey string `json:"protected_master_key" validate:"required"`
-	MasterKeyIV        string `json:"master_key_iv" validate:"required"`
-	MasterKeySalt      string `json:"master_key_salt" validate:"required"`
+	ProtectedMasterKey         string `json:"protected_master_key" validate:"required"`
+	MasterKeyIV                string `json:"master_key_iv" validate:"required"`
+	MasterKeySalt              string `json:"master_key_salt" validate:"required"`
+	RecoveryKey                string `json:"recovery_key" validate:"required,min=8"`
+	RecoveryProtectedMasterKey string `json:"recovery_protected_master_key" validate:"required"`
+	RecoveryKeyIV              string `json:"recovery_key_iv" validate:"required"`
+	RecoveryKeySalt            string `json:"recovery_key_salt" validate:"required"`
 }
 
 type LoginDTO struct {
@@ -37,6 +41,19 @@ type Verify2FADTO struct {
 
 type ChangeMasterPasswordDTO struct {
 	OldPassword        string `json:"old_password" validate:"required"`
+	NewPassword        string `json:"new_password" validate:"required,min=8"`
+	ProtectedMasterKey string `json:"protected_master_key" validate:"required"`
+	MasterKeyIV        string `json:"master_key_iv" validate:"required"`
+	MasterKeySalt      string `json:"master_key_salt" validate:"required"`
+}
+
+type FetchRecoveryDTO struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+type ResetPasswordDTO struct {
+	Email              string `json:"email" validate:"required,email"`
+	RecoveryKey        string `json:"recovery_key" validate:"required"`
 	NewPassword        string `json:"new_password" validate:"required,min=8"`
 	ProtectedMasterKey string `json:"protected_master_key" validate:"required"`
 	MasterKeyIV        string `json:"master_key_iv" validate:"required"`
