@@ -18,13 +18,34 @@ import (
 	"gorm.io/gorm"
 )
 
+// AuthService manages authentication, registration, and user security (2FA/MasterKey).
 type AuthService interface {
+	// Register creates a new user with their encrypted MasterKey.
 	Register(registerDTO dto.RegisterDTO) error
+
+	// Login verifies credentials and returns the MasterKey if successful.
 	Login(loginDTO dto.LoginDTO) (*dto.LoginResponseDTO, error)
+
+	// UserExists checks if an email is already registered in the system.
 	UserExists(email string) (bool, error)
+
+	// Generate2FASecret generates a new seed for two-factor authentication.
 	Generate2FASecret(userID uuid.UUID) (*dto.Setup2FAResponseDTO, error)
+
+	// Enable2FA activates two-factor authentication for a user.
 	Enable2FA(userID uuid.UUID, enableDTO dto.Enable2FADTO) ([]string, error)
-	Verify2FALogin(userID uuid.UUID, code string) (string, error)
+
+	// Verify2FALogin validates the 2FA code during login.
+	Verify2FALogin(userID uuid.UUID, code string) (*dto.LoginResponseDTO, error)
+
+	// ChangeMasterPassword atomically updates the password and the protected MasterKey.
+	ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMasterPasswordDTO) error
+
+	// FetchRecoveryData returns the recovery block for a given email.
+	FetchRecoveryData(email string) (*models.User, error)
+
+	// ResetPasswordWithRecoveryKey validates the RK and updates the MK.
+	ResetPasswordWithRecoveryKey(input dto.ResetPasswordDTO) error
 }
 
 type authService struct {
@@ -51,12 +72,26 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	if err != nil {
 		return err
 	}
+	
+	// Hash recovery key
+	hashedRecoveryKey, err := security.HashPassword(registerDTO.RecoveryKey)
+	if err != nil {
+		return err
+	}
+
 	name := strings.Split(registerDTO.Email, "@")[0]
 
 	user := &models.User{
-		Email:        registerDTO.Email,
-		PasswordHash: hashedPassword,
-		CreatedAt:    time.Now(),
+		Email:              registerDTO.Email,
+		PasswordHash:       hashedPassword,
+		RecoveryKeyHash:    hashedRecoveryKey,
+		ProtectedMasterKey: registerDTO.ProtectedMasterKey,
+		MasterKeyIV:        registerDTO.MasterKeyIV,
+		MasterKeySalt:      registerDTO.MasterKeySalt,
+		RecoveryProtectedMasterKey: registerDTO.RecoveryProtectedMasterKey,
+		RecoveryKeyIV:              registerDTO.RecoveryKeyIV,
+		RecoveryKeySalt:            registerDTO.RecoveryKeySalt,
+		CreatedAt:          time.Now(),
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
@@ -124,8 +159,11 @@ func (s *authService) Login(loginDTO dto.LoginDTO) (*dto.LoginResponseDTO, error
 	}
 
 	return &dto.LoginResponseDTO{
-		Require2FA: false,
-		Token:      tokenString,
+		Require2FA:         false,
+		Token:              tokenString,
+		ProtectedMasterKey: user.ProtectedMasterKey,
+		MasterKeyIV:        user.MasterKeyIV,
+		MasterKeySalt:      user.MasterKeySalt,
 	}, nil
 }
 
@@ -177,7 +215,7 @@ func (s *authService) Enable2FA(userID uuid.UUID, enableDTO dto.Enable2FADTO) ([
 
 	// Generate 8 backup codes
 	backupCodes := make([]string, 8)
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		code, err := security.GenerateRandomString(8)
 		if err != nil {
 			return nil, err
@@ -198,14 +236,14 @@ func (s *authService) Enable2FA(userID uuid.UUID, enableDTO dto.Enable2FADTO) ([
 	return backupCodes, nil
 }
 
-func (s *authService) Verify2FALogin(userID uuid.UUID, code string) (string, error) {
+func (s *authService) Verify2FALogin(userID uuid.UUID, code string) (*dto.LoginResponseDTO, error) {
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if !user.TwoFactorEnabled {
-		return "", errors.New("2FA is not enabled for this user")
+		return nil, errors.New("2FA is not enabled for this user")
 	}
 
 	// Try TOTP first
@@ -224,7 +262,7 @@ func (s *authService) Verify2FALogin(userID uuid.UUID, code string) (string, err
 		}
 
 		if found == -1 {
-			return "", errors.New("invalid verification code")
+			return nil, errors.New("invalid verification code")
 		}
 
 		// Remove the used backup code
@@ -232,11 +270,22 @@ func (s *authService) Verify2FALogin(userID uuid.UUID, code string) (string, err
 		backupCodesBytes, _ := json.Marshal(backupCodes)
 		user.TwoFactorBackupCodes = datatypes.JSON(backupCodesBytes)
 		if err := s.userRepo.Update(user); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
-	return s.generateSessionToken(user)
+	tokenString, err := s.generateSessionToken(user)
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.LoginResponseDTO{
+		Require2FA:         false,
+		Token:              tokenString,
+		ProtectedMasterKey: user.ProtectedMasterKey,
+		MasterKeyIV:        user.MasterKeyIV,
+		MasterKeySalt:      user.MasterKeySalt,
+	}, nil
 }
 
 func (s *authService) UserExists(email string) (bool, error) {
@@ -248,4 +297,81 @@ func (s *authService) UserExists(email string) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+func (s *authService) ChangeMasterPassword(userID uuid.UUID, input dto.ChangeMasterPasswordDTO) error {
+	user, err := s.userRepo.FindByID(userID)
+	if err != nil {
+		return err
+	}
+
+	// 1. Verify old password
+	match, err := security.VerifyPassword(input.OldPassword, user.PasswordHash)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return errors.New("invalid current password")
+	}
+
+	// 2. Hash new password
+	newPasswordHash, err := security.HashPassword(input.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	// 3. Update all security metadata
+	user.PasswordHash = newPasswordHash
+	user.ProtectedMasterKey = input.ProtectedMasterKey
+	user.MasterKeyIV = input.MasterKeyIV
+	user.MasterKeySalt = input.MasterKeySalt
+
+	return s.userRepo.Update(user)
+}
+
+func (s *authService) FetchRecoveryData(email string) (*models.User, error) {
+	user, err := s.userRepo.FindByEmail(email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return user, nil
+}
+
+func (s *authService) ResetPasswordWithRecoveryKey(input dto.ResetPasswordDTO) error {
+	user, err := s.userRepo.FindByEmail(input.Email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("user not found")
+		}
+		return err
+	}
+
+	// 1. Verify Recovery Key
+	match, err := security.VerifyPassword(input.RecoveryKey, user.RecoveryKeyHash)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return errors.New("invalid recovery key")
+	}
+
+	// 2. Hash new password
+	newPasswordHash, err := security.HashPassword(input.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	// 3. Update security metadata
+	user.PasswordHash = newPasswordHash
+	user.ProtectedMasterKey = input.ProtectedMasterKey
+	user.MasterKeyIV = input.MasterKeyIV
+	user.MasterKeySalt = input.MasterKeySalt
+
+	// Note: We don't change the Recovery key or its encrypted block here.
+	// The RK stays the same for the lifetime of the account unless explicitly rotated.
+
+	return s.userRepo.Update(user)
 }

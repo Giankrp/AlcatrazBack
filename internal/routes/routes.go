@@ -20,6 +20,8 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	auth.POST("/logout", authHandler.Logout)
 	auth.GET("/exists", authHandler.UserExists)
 	auth.POST("/2fa/verify", authHandler.Verify2FALogin)
+	auth.POST("/recovery/fetch", authHandler.FetchRecoveryData)
+	auth.POST("/recovery/reset", authHandler.ResetPassword)
 
 	// Protected routes
 	protected := api.Group("")
@@ -38,16 +40,21 @@ func SetupRoutes(e *echo.Echo, authHandler *handlers.AuthHandler, vaultHandler *
 	user := protected.Group("/user")
 	user.GET("/profile", userProfileHandler.GetProfile)
 	user.PUT("/profile", userProfileHandler.UpdateProfile)
+	user.POST("/change-password", authHandler.ChangeMasterPassword)
 	user.POST("/2fa/setup", authHandler.Setup2FA)
 	user.POST("/2fa/enable", authHandler.Enable2FA)
+	user.DELETE("/account", userProfileHandler.DeleteAccount)
 
 	// Vault routes
 	vault := protected.Group("/vault")
 	vault.POST("/items", vaultHandler.CreateItem)
 	vault.GET("/items", vaultHandler.GetItems)
+	vault.GET("/trash", vaultHandler.GetTrash)
 	vault.GET("/items/:id", vaultHandler.GetItem)
 	vault.PUT("/items/:id", vaultHandler.UpdateItem)
-	vault.DELETE("/items/:id", vaultHandler.DeleteItem)
+	vault.DELETE("/items/:id", vaultHandler.MoveToTrash)
+	vault.POST("/items/:id/restore", vaultHandler.RestoreItem)
+	vault.DELETE("/items/:id/permanent", vaultHandler.DeleteItem)
 
 	// Folder routes
 	vault.POST("/folders", vaultHandler.CreateFolder)

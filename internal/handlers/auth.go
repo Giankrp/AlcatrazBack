@@ -14,14 +14,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// AuthHandler manages HTTP requests related to authentication and user management.
 type AuthHandler struct {
 	authService services.AuthService
 }
 
+// NewAuthHandler creates a new instance of the authentication controller.
 func NewAuthHandler(authService services.AuthService) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
+// Register handles the creation of new users.
 func (h *AuthHandler) Register(c echo.Context) error {
 	var register dto.RegisterDTO
 	if err := c.Bind(&register); err != nil {
@@ -36,8 +39,6 @@ func (h *AuthHandler) Register(c echo.Context) error {
 
 	log.Debug("Register attempt", "email", register.Email)
 	if err := h.authService.Register(register); err != nil {
-		// En un caso real, chequear tipo de error para devolver 409 Conflict si ya existe, etc.
-		// Por simplicidad, 400 o 500 según corresponda.
 		log.Warn("Registration failed", "error", err, "email", register.Email)
 		if err.Error() == "email already registered" {
 			return c.JSON(http.StatusConflict, echo.Map{"error": err.Error()})
@@ -80,19 +81,50 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Set JWT as HttpOnly cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
 
 	log.Info("Login successful", "email", login.Email)
-	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+	return c.JSON(http.StatusOK, echo.Map{
+		"message":              "login successful",
+		"protected_master_key": loginRes.ProtectedMasterKey,
+		"master_key_iv":        loginRes.MasterKeyIV,
+		"master_key_salt":      loginRes.MasterKeySalt,
+	})
+}
+
+func (h *AuthHandler) ChangeMasterPassword(c echo.Context) error {
+	user := c.Get("user").(*jwt.Token)
+	claims := user.Claims.(jwt.MapClaims)
+	userIDStr := claims["user_id"].(string)
+	userID, _ := uuid.Parse(userIDStr)
+
+	var input dto.ChangeMasterPasswordDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	if err := h.authService.ChangeMasterPassword(userID, input); err != nil {
+		if err.Error() == "invalid current password" {
+			return c.JSON(http.StatusUnauthorized, echo.Map{"error": err.Error()})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "master password updated successfully"})
 }
 
 func (h *AuthHandler) Setup2FA(c echo.Context) error {
@@ -159,35 +191,42 @@ func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
 	userIDStr := claims["user_id"].(string)
 	userID, _ := uuid.Parse(userIDStr)
 
-	finalToken, err := h.authService.Verify2FALogin(userID, verify.Code)
+	loginRes, err := h.authService.Verify2FALogin(userID, verify.Code)
 	if err != nil {
 		return c.JSON(http.StatusUnauthorized, echo.Map{"error": err.Error()})
 	}
 
 	// Set final JWT as HttpOnly cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
-		Value:    finalToken,
+		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
 
-	return c.JSON(http.StatusOK, echo.Map{"message": "login successful"})
+	return c.JSON(http.StatusOK, echo.Map{
+		"message":              "login successful",
+		"protected_master_key": loginRes.ProtectedMasterKey,
+		"master_key_iv":        loginRes.MasterKeyIV,
+		"master_key_salt":      loginRes.MasterKeySalt,
+	})
 }
 
 func (h *AuthHandler) Logout(c echo.Context) error {
 	log.Debug("Logout attempt")
 	// Expire the auth cookie
+	isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
@@ -213,4 +252,51 @@ func (h *AuthHandler) UserExists(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, echo.Map{"exists": exists})
+}
+
+func (h *AuthHandler) FetchRecoveryData(c echo.Context) error {
+	var input dto.FetchRecoveryDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	user, err := h.authService.FetchRecoveryData(input.Email)
+	if err != nil {
+		if err.Error() == "user not found" {
+			// To prevent email enumeration during recovery, we could return 200 with fake data,
+			// but for a TFG, returning 404 or a generic message is acceptable.
+			return c.JSON(http.StatusNotFound, echo.Map{"error": "user not found"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"recovery_protected_master_key": user.RecoveryProtectedMasterKey,
+		"recovery_key_iv":               user.RecoveryKeyIV,
+		"recovery_key_salt":             user.RecoveryKeySalt,
+	})
+}
+
+func (h *AuthHandler) ResetPassword(c echo.Context) error {
+	var input dto.ResetPasswordDTO
+	if err := c.Bind(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid request format"})
+	}
+
+	if err := validator.Validate.Struct(&input); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": validator.ValidationErrors(err)})
+	}
+
+	if err := h.authService.ResetPasswordWithRecoveryKey(input); err != nil {
+		if err.Error() == "user not found" || err.Error() == "invalid recovery key" {
+			return c.JSON(http.StatusUnauthorized, echo.Map{"error": "invalid recovery key or email"})
+		}
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
+	}
+
+	return c.JSON(http.StatusOK, echo.Map{"message": "password reset successfully"})
 }

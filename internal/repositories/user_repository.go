@@ -14,6 +14,7 @@ type UserRepository interface {
 	UpdateProfile(profile *models.UserProfile) error
 	FindByID(id uuid.UUID) (*models.User, error)
 	Update(user *models.User) error
+	Delete(id uuid.UUID) error
 }
 
 type userRepository struct {
@@ -62,4 +63,26 @@ func (r *userRepository) FindByID(id uuid.UUID) (*models.User, error) {
 
 func (r *userRepository) Update(user *models.User) error {
 	return r.db.Save(user).Error
+}
+
+func (r *userRepository) Delete(id uuid.UUID) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// Delete VaultItems
+		if err := tx.Where("user_id = ?", id).Delete(&models.VaultItem{}).Error; err != nil {
+			return err
+		}
+		// Delete VaultFolders
+		if err := tx.Where("user_id = ?", id).Delete(&models.VaultFolder{}).Error; err != nil {
+			return err
+		}
+		// Delete UserProfile
+		if err := tx.Where("user_id = ?", id).Delete(&models.UserProfile{}).Error; err != nil {
+			return err
+		}
+		// Delete User
+		if err := tx.Where("id = ?", id).Delete(&models.User{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
 }

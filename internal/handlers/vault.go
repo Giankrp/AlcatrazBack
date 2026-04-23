@@ -6,16 +6,18 @@ import (
 	"github.com/Giankrp/AlcatrazBack/internal/dto"
 	"github.com/Giankrp/AlcatrazBack/internal/services"
 	"github.com/go-playground/validator/v10"
-	"github.com/google/uuid"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
+// VaultHandler manages HTTP requests for vault handling (items and folders).
 type VaultHandler struct {
 	service   services.VaultService
 	validator *validator.Validate
 }
 
+// NewVaultHandler creates a new instance of the vault controller.
 func NewVaultHandler(service services.VaultService) *VaultHandler {
 	return &VaultHandler{
 		service:   service,
@@ -57,6 +59,18 @@ func (h *VaultHandler) GetItems(c echo.Context) error {
 	items, err := h.service.GetItems(userID)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch items"})
+	}
+	return c.JSON(http.StatusOK, items)
+}
+
+func (h *VaultHandler) GetTrash(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	items, err := h.service.GetTrashedItems(userID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to fetch trash items"})
 	}
 	return c.JSON(http.StatusOK, items)
 }
@@ -107,6 +121,40 @@ func (h *VaultHandler) UpdateItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
+func (h *VaultHandler) MoveToTrash(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
+	}
+
+	if err := h.service.MoveToTrash(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to move item to trash"})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
+func (h *VaultHandler) RestoreItem(c echo.Context) error {
+	userID := getUserIDFromToken(c)
+	if userID == uuid.Nil {
+		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
+	}
+	itemID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
+	}
+
+	if err := h.service.RestoreFromTrash(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to restore item"})
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
+
 func (h *VaultHandler) DeleteItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -117,8 +165,8 @@ func (h *VaultHandler) DeleteItem(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid item ID"})
 	}
 
-	if err := h.service.DeleteItem(userID, itemID); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete item"})
+	if err := h.service.PermanentlyDelete(userID, itemID); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to delete item permanently"})
 	}
 
 	return c.NoContent(http.StatusNoContent)
@@ -210,9 +258,9 @@ func (h *VaultHandler) DeleteFolder(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// Helper para extraer ID del token JWT
+// getUserIDFromToken is a helper to extract the user ID from the JWT token.
 func getUserIDFromToken(c echo.Context) uuid.UUID {
-	// Verificar si el contexto tiene el usuario
+	// Check if the context has the user
 	userToken, ok := c.Get("user").(*jwt.Token)
 	if !ok || userToken == nil {
 		return uuid.Nil

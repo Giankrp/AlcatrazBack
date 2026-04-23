@@ -10,18 +10,42 @@ import (
 	"github.com/google/uuid"
 )
 
+// VaultService manages the business logic for vault items and folders.
 type VaultService interface {
-	// Items
+	// CreateItem creates a new encrypted item in the user's vault.
 	CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO) (*models.VaultItem, error)
-	GetItems(userID uuid.UUID) ([]models.VaultItem, error)
-	GetItem(userID uuid.UUID, itemID uuid.UUID) (*models.VaultItem, error)
-	UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.UpdateVaultItemDTO) (*models.VaultItem, error)
-	DeleteItem(userID uuid.UUID, itemID uuid.UUID) error
 
-	// Folders
+	// GetItems returns all visible vault items for a user.
+	GetItems(userID uuid.UUID) ([]models.VaultItem, error)
+
+	// GetTrashedItems returns all items currently in the trash.
+	GetTrashedItems(userID uuid.UUID) ([]models.VaultItem, error)
+
+	// GetItem returns a specific vault item.
+	GetItem(userID uuid.UUID, itemID uuid.UUID) (*models.VaultItem, error)
+
+	// UpdateItem updates metadata or encrypted content of an item.
+	UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.UpdateVaultItemDTO) (*models.VaultItem, error)
+
+	// MoveToTrash marks an item as trashed.
+	MoveToTrash(userID uuid.UUID, itemID uuid.UUID) error
+
+	// RestoreFromTrash removes the trashed mark from an item.
+	RestoreFromTrash(userID uuid.UUID, itemID uuid.UUID) error
+
+	// PermanentlyDelete deletes an item from the database forever.
+	PermanentlyDelete(userID uuid.UUID, itemID uuid.UUID) error
+
+	// CreateFolder creates a new folder for organizing items.
 	CreateFolder(userID uuid.UUID, input dto.CreateVaultFolderDTO) (*models.VaultFolder, error)
+
+	// GetFolders lists all folders belonging to a user.
 	GetFolders(userID uuid.UUID) ([]models.VaultFolder, error)
+
+	// UpdateFolder modifies folder metadata like its name.
 	UpdateFolder(userID uuid.UUID, folderID uuid.UUID, input dto.UpdateVaultFolderDTO) (*models.VaultFolder, error)
+
+	// DeleteFolder deletes a folder and reassigns its items to the default folder.
 	DeleteFolder(userID uuid.UUID, folderID uuid.UUID) error
 }
 
@@ -54,9 +78,10 @@ func (s *vaultService) CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO
 	item := &models.VaultItem{
 		UserID:   userID,
 		FolderID: folderID,
-		ItemType: models.VaultItemType(input.ItemType),
-		Title:    input.Title,
-		Icon:     input.Icon,
+		ItemType:      models.VaultItemType(input.ItemType),
+		Title:         input.Title,
+		Icon:          input.Icon,
+		SecurityScore: input.SecurityScore,
 		Secret: &models.VaultSecret{
 			EncryptedData: input.Secret.Data,
 			IV:            input.Secret.Iv,
@@ -72,6 +97,10 @@ func (s *vaultService) CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO
 
 func (s *vaultService) GetItems(userID uuid.UUID) ([]models.VaultItem, error) {
 	return s.repo.FindAllByUserID(userID)
+}
+
+func (s *vaultService) GetTrashedItems(userID uuid.UUID) ([]models.VaultItem, error) {
+	return s.repo.FindTrashedByUserID(userID)
 }
 
 func (s *vaultService) GetItem(userID uuid.UUID, itemID uuid.UUID) (*models.VaultItem, error) {
@@ -121,6 +150,10 @@ func (s *vaultService) UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.
 		item.Trashed = *input.Trashed
 	}
 
+	if input.SecurityScore != nil {
+		item.SecurityScore = input.SecurityScore
+	}
+
 	if err := s.repo.Update(item); err != nil {
 		return nil, err
 	}
@@ -128,13 +161,30 @@ func (s *vaultService) UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.
 	return item, nil
 }
 
-func (s *vaultService) DeleteItem(userID uuid.UUID, itemID uuid.UUID) error {
-	// Verificar que existe y pertenece al usuario
+func (s *vaultService) MoveToTrash(userID uuid.UUID, itemID uuid.UUID) error {
+	// Verify it exists and belongs to user
 	_, err := s.repo.FindByID(itemID, userID)
 	if err != nil {
 		return errors.New("item not found or unauthorized")
 	}
-	return s.repo.Delete(itemID, userID)
+	return s.repo.MoveToTrash(itemID, userID)
+}
+
+func (s *vaultService) RestoreFromTrash(userID uuid.UUID, itemID uuid.UUID) error {
+	item, err := s.repo.FindByID(itemID, userID)
+	if err != nil {
+		return errors.New("item not found or unauthorized")
+	}
+	item.Trashed = false
+	return s.repo.Update(item)
+}
+
+func (s *vaultService) PermanentlyDelete(userID uuid.UUID, itemID uuid.UUID) error {
+	_, err := s.repo.FindByID(itemID, userID)
+	if err != nil {
+		return errors.New("item not found or unauthorized")
+	}
+	return s.repo.PermanentlyDelete(itemID, userID)
 }
 
 // Folder Methods Implementation

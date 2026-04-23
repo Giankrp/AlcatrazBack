@@ -11,8 +11,10 @@ type VaultRepository interface {
 	Create(item *models.VaultItem) error
 	FindByID(id uuid.UUID, userID uuid.UUID) (*models.VaultItem, error)
 	FindAllByUserID(userID uuid.UUID) ([]models.VaultItem, error)
+	FindTrashedByUserID(userID uuid.UUID) ([]models.VaultItem, error)
 	Update(item *models.VaultItem) error
-	Delete(id uuid.UUID, userID uuid.UUID) error
+	MoveToTrash(id uuid.UUID, userID uuid.UUID) error
+	PermanentlyDelete(id uuid.UUID, userID uuid.UUID) error
 
 	// Folder methods
 	CreateFolder(folder *models.VaultFolder) error
@@ -46,23 +48,33 @@ func (r *vaultRepository) FindByID(id uuid.UUID, userID uuid.UUID) (*models.Vaul
 
 func (r *vaultRepository) FindAllByUserID(userID uuid.UUID) ([]models.VaultItem, error) {
 	var items []models.VaultItem
-	// Do NOT Preload Secret for list view (Performance Optimization)
-	if err := r.db.Where("user_id = ? AND deleted_at IS NULL", userID).Find(&items).Error; err != nil {
+	// Do NOT Preload Secret for list view. Only items NOT in trash.
+	if err := r.db.Where("user_id = ? AND trashed = ?", userID, false).Find(&items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (r *vaultRepository) FindTrashedByUserID(userID uuid.UUID) ([]models.VaultItem, error) {
+	var items []models.VaultItem
+	if err := r.db.Where("user_id = ? AND trashed = ?", userID, true).Find(&items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
 func (r *vaultRepository) Update(item *models.VaultItem) error {
-	// Save essentially does a full update (upsert) on the model and its associations if configured
-	// But to be safe and explicit with GORM associations, usually Session.Save works for the primary model.
-	// For associations, we might need to be careful. However, with FullSaveAssociations or manual handling:
-	// Let's use a transaction to ensure both are updated if we pass the whole object.
 	return r.db.Session(&gorm.Session{FullSaveAssociations: true}).Save(item).Error
 }
 
-func (r *vaultRepository) Delete(id uuid.UUID, userID uuid.UUID) error {
-	return r.db.Where("id = ? AND user_id = ?", id, userID).Delete(&models.VaultItem{}).Error
+func (r *vaultRepository) MoveToTrash(id uuid.UUID, userID uuid.UUID) error {
+	return r.db.Model(&models.VaultItem{}).
+		Where("id = ? AND user_id = ?", id, userID).
+		Update("trashed", true).Error
+}
+
+func (r *vaultRepository) PermanentlyDelete(id uuid.UUID, userID uuid.UUID) error {
+	return r.db.Unscoped().Where("id = ? AND user_id = ?", id, userID).Delete(&models.VaultItem{}).Error
 }
 
 // Folder Methods Implementation
