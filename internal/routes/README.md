@@ -13,42 +13,40 @@ Centraliza la definición y configuración de todas las rutas HTTP de la API, in
 
 ---
 
-## Archivos
-
-### `routes.go`
-
-Expone una única función `SetupRoutes` que recibe la instancia de Echo y todos los handlers inicializados:
-
-```go
-func SetupRoutes(
-    e *echo.Echo,
-    authHandler *handlers.AuthHandler,
-    vaultHandler *handlers.VaultHandler,
-    userProfileHandler *handlers.UserProfileHandler,
-)
-```
-
----
-
 ## Estructura de Rutas
 
 ```
 /api
 ├── /auth                    [PÚBLICO]
-│   ├── POST /register       → AuthHandler.Register
-│   ├── POST /login          → AuthHandler.Login
-│   └── POST /logout         → AuthHandler.Logout
+│   ├── POST /register
+│   ├── POST /login
+│   ├── POST /logout
+│   ├── GET  /exists
+│   ├── POST /2fa/verify
+│   ├── POST /recovery/fetch
+│   └── POST /recovery/reset
 │
 ├── /user                    [🔐 PROTEGIDO]
-│   ├── GET  /profile        → UserProfileHandler.GetProfile
-│   └── PUT  /profile        → UserProfileHandler.UpdateProfile
+│   ├── GET  /profile
+│   ├── PUT  /profile
+│   ├── POST /change-password
+│   ├── POST /2fa/setup
+│   ├── POST /2fa/enable
+│   └── DELETE /account
 │
 └── /vault                   [🔐 PROTEGIDO]
-    ├── POST   /items        → VaultHandler.CreateItem
-    ├── GET    /items        → VaultHandler.GetItems
-    ├── GET    /items/:id    → VaultHandler.GetItem
-    ├── PUT    /items/:id    → VaultHandler.UpdateItem
-    └── DELETE /items/:id    → VaultHandler.DeleteItem
+    ├── GET    /items
+    ├── POST   /items
+    ├── GET    /items/:id
+    ├── PUT    /items/:id
+    ├── DELETE /items/:id
+    ├── GET    /trash
+    ├── POST   /items/:id/restore
+    ├── DELETE /items/:id/permanent
+    ├── GET    /folders
+    ├── POST   /folders
+    ├── PUT    /folders/:id
+    └── DELETE /folders/:id
 ```
 
 ---
@@ -64,38 +62,36 @@ protected.Use(echojwt.WithConfig(echojwt.Config{
 }))
 ```
 
-| Configuración | Valor | Descripción |
-|---|---|---|
-| `SigningKey` | `JWT_SECRET` (env) | Clave para verificar la firma del token |
-| `TokenLookup` | `cookie:auth_token` | Lee el JWT desde la cookie `auth_token` |
-
-> 🔒 El token **no** se envía en el header `Authorization`. Se usa una cookie HttpOnly para prevenir acceso desde JavaScript (protección contra XSS).
-
----
-
-## Grupos de Rutas
-
-| Grupo | Prefijo | Middleware | Descripción |
-|---|---|---|---|
-| `api` | `/api` | — | Grupo base de la API |
-| `auth` | `/api/auth` | — | Autenticación (público) |
-| `protected` | `/api` | JWT cookie | Rutas que requieren autenticación |
-| `user` | `/api/user` | JWT cookie | Perfil de usuario |
-| `vault` | `/api/vault` | JWT cookie | Bóveda de secretos |
+> 🔒 **Seguridad**: El token no es accesible desde JavaScript (protección contra XSS). Para el flujo de 2FA, se utiliza un token temporal enviado en el header `X-Temp-Token` durante la verificación final.
 
 ---
 
 ## Tabla Completa de Endpoints
 
-| Método | Ruta | Auth | Handler | Descripción |
-|---|---|---|---|---|
-| `POST` | `/api/auth/register` | ❌ | `AuthHandler.Register` | Registro de usuario |
-| `POST` | `/api/auth/login` | ❌ | `AuthHandler.Login` | Login (establece cookie) |
-| `POST` | `/api/auth/logout` | ❌ | `AuthHandler.Logout` | Logout (expira cookie) |
-| `GET` | `/api/user/profile` | ✅ | `UserProfileHandler.GetProfile` | Obtener perfil |
-| `PUT` | `/api/user/profile` | ✅ | `UserProfileHandler.UpdateProfile` | Actualizar perfil |
-| `POST` | `/api/vault/items` | ✅ | `VaultHandler.CreateItem` | Crear item |
-| `GET` | `/api/vault/items` | ✅ | `VaultHandler.GetItems` | Listar items |
-| `GET` | `/api/vault/items/:id` | ✅ | `VaultHandler.GetItem` | Obtener item |
-| `PUT` | `/api/vault/items/:id` | ✅ | `VaultHandler.UpdateItem` | Actualizar item |
-| `DELETE` | `/api/vault/items/:id` | ✅ | `VaultHandler.DeleteItem` | Eliminar item |
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| `POST` | `/api/auth/register` | ❌ | Registro de usuario |
+| `POST` | `/api/auth/login` | ❌ | Login (establece cookie o requiere 2FA) |
+| `POST` | `/api/auth/logout` | ❌ | Logout (expira cookie) |
+| `GET` | `/api/auth/exists` | ❌ | Comprobar disponibilidad de email |
+| `POST` | `/api/auth/2fa/verify` | ❌ | Verificar TOTP (requiere token temporal) |
+| `POST` | `/api/auth/recovery/fetch` | ❌ | Obtener metadata de recuperación |
+| `POST` | `/api/auth/recovery/reset` | ❌ | Resetear pass con Recovery Key |
+| `GET` | `/api/user/profile` | ✅ | Obtener perfil |
+| `PUT` | `/api/user/profile` | ✅ | Actualizar perfil |
+| `POST` | `/api/user/change-password` | ✅ | Actualizar master password |
+| `POST` | `/api/user/2fa/setup` | ✅ | Generar secreto TOTP |
+| `POST` | `/api/user/2fa/enable` | ✅ | Activar 2FA |
+| `DELETE` | `/api/user/account` | ✅ | Eliminar cuenta |
+| `GET` | `/api/vault/items` | ✅ | Listar items activos |
+| `POST` | `/api/vault/items` | ✅ | Crear item |
+| `GET` | `/api/vault/items/:id` | ✅ | Obtener item (con secreto) |
+| `PUT` | `/api/vault/items/:id` | ✅ | Actualizar item |
+| `DELETE` | `/api/vault/items/:id` | ✅ | Mover a papelera |
+| `GET` | `/api/vault/trash` | ✅ | Listar papelera |
+| `POST` | `/api/vault/items/:id/restore`| ✅ | Restaurar item |
+| `DELETE` | `/api/vault/items/:id/permanent`| ✅ | Eliminar permanentemente |
+| `GET` | `/api/vault/folders` | ✅ | Listar carpetas |
+| `POST` | `/api/vault/folders` | ✅ | Crear carpeta |
+| `PUT` | `/api/vault/folders/:id` | ✅ | Renombrar carpeta |
+| `DELETE` | `/api/vault/folders/:id` | ✅ | Eliminar carpeta |

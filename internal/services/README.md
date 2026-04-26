@@ -6,21 +6,17 @@ Encapsula la **Lógica de Negocio** de la aplicación. Es el núcleo funcional q
 
 ## Responsabilidades
 
-1. **Reglas de negocio**: Validaciones lógicas (email duplicado, permisos de acceso, etc.)
+1. **Reglas de negocio**: Validaciones lógicas (2FA, permisos de acceso, integridad de carpetas)
 2. **Transformación de datos**: Convertir DTOs → Models y viceversa
-3. **Coordinación**: Puede llamar a múltiples repositories para completar una operación
-4. **Seguridad de acceso**: Filtrar siempre por `UserID`
-5. **Gestión de tokens**: Generar y firmar JWT
+3. **Seguridad**: Gestión de tokens JWT, hashing, y validación de TOTP
+4. **Criptografía**: Manejo de metadatos de Master Key (Zero Knowledge)
+5. **Transaccionalidad**: Garantizar consistencia en operaciones complejas (ej. eliminar carpeta)
 
 ---
 
 ## Independencia de Transporte
 
-Los services **NO** dependen de `echo.Context` ni de HTTP. Podrían ser invocados desde:
-- Handlers HTTP (uso actual)
-- CLI tools
-- gRPC services
-- Workers/cron jobs
+Los services son agnósticos al protocolo (HTTP/gRPC/CLI). Trabajan con tipos de dominio y tipos básicos (UUID, string).
 
 ---
 
@@ -28,118 +24,77 @@ Los services **NO** dependen de `echo.Context` ni de HTTP. Podrían ser invocado
 
 ### `auth_service.go` — `AuthService`
 
-Gestiona el ciclo completo de autenticación.
+Gestiona el ciclo completo de identidad y seguridad del usuario.
 
 ```go
 type AuthService interface {
-    Register(registerDTO dto.RegisterDTO) error
-    Login(loginDTO dto.LoginDTO) (string, error)
+    Register(dto.RegisterDTO) error
+    Login(dto.LoginDTO) (*dto.LoginResponseDTO, error)
+    UserExists(email string) (bool, error)
+    Generate2FASecret(userID uuid.UUID) (*dto.Setup2FAResponseDTO, error)
+    Enable2FA(userID uuid.UUID, dto.Enable2FADTO) ([]string, error)
+    Verify2FALogin(userID uuid.UUID, code string) (*dto.LoginResponseDTO, error)
+    ChangeMasterPassword(userID uuid.UUID, dto.ChangeMasterPasswordDTO) error
+    FetchRecoveryData(email string) (*models.User, error)
+    ResetPasswordWithRecoveryKey(dto.ResetPasswordDTO) error
 }
 ```
 
-#### `Register` — Registro de Usuario
-
-| Paso | Acción |
-|---|---|
-| 1 | Verificar si el email ya existe (`FindByEmail`) |
-| 2 | Si existe → retorna `"email already registered"` |
-| 3 | Hashear la contraseña con Argon2id (`security.HashPassword`) |
-| 4 | Extraer nombre del email (parte antes de `@`) |
-| 5 | Crear usuario (`userRepo.Create`) |
-| 6 | Crear perfil con nombre auto-generado (`userRepo.CreateProfile`) |
-
-> 💡 Al registrarse, se crea automáticamente un `UserProfile` con el nombre derivado del email.
-
-#### `Login` — Inicio de Sesión
-
-| Paso | Acción |
-|---|---|
-| 1 | Buscar usuario por email (`FindByEmail`) |
-| 2 | Si no existe → retorna `"invalid credentials"` |
-| 3 | Verificar contraseña (`security.VerifyPassword`) |
-| 4 | Si no coincide → retorna `"invalid credentials"` |
-| 5 | Generar token JWT con claims `user_id`, `email`, `exp` |
-| 6 | Firmar con `JWT_SECRET` (HS256) |
-| 7 | Retornar token al handler |
-
-**Claims del JWT:**
-
-```go
-jwt.MapClaims{
-    "user_id": user.ID,      // UUID del usuario
-    "email":   user.Email,    // Email
-    "exp":     +12h,          // Expiración (12 horas)
-}
-```
+#### Características Clave:
+- **MFA (2FA)**: Soporte para TOTP y Backup Codes. Al loguearse, si el 2FA está activo, se emite un token temporal de 10 minutos para el paso de verificación.
+- **Recovery Key**: Permite recuperar el acceso a la cuenta (incluyendo la Master Key cifrada) sin conocer la contraseña anterior, usando una clave de recuperación generada al registrarse.
+- **Zero Knowledge**: Almacena el `ProtectedMasterKey` (MK cifrada con la clave derivada de la password) para que el cliente pueda recuperarla tras el login.
 
 ---
 
 ### `vault_service.go` — `VaultService`
 
-CRUD completo de items de la bóveda con transformación DTO → Model.
+Gestión de ítems, carpetas y seguridad de la bóveda.
 
 ```go
 type VaultService interface {
-    CreateItem(userID string, input dto.CreateVaultItemDTO) (*models.VaultItem, error)
-    GetItems(userID string) ([]models.VaultItem, error)
-    GetItem(userID string, itemID string) (*models.VaultItem, error)
-    UpdateItem(userID string, itemID string, input dto.UpdateVaultItemDTO) (*models.VaultItem, error)
-    DeleteItem(userID string, itemID string) error
+    CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO) (*models.VaultItem, error)
+    GetItems(userID uuid.UUID) ([]models.VaultItem, error)
+    GetTrashedItems(userID uuid.UUID) ([]models.VaultItem, error)
+    GetItem(userID uuid.UUID, itemID uuid.UUID) (*models.VaultItem, error)
+    UpdateItem(userID uuid.UUID, itemID uuid.UUID, input dto.UpdateVaultItemDTO) (*models.VaultItem, error)
+    MoveToTrash(userID uuid.UUID, itemID uuid.UUID) error
+    RestoreFromTrash(userID uuid.UUID, itemID uuid.UUID) error
+    PermanentlyDelete(userID uuid.UUID, itemID uuid.UUID) error
+    CreateFolder(userID uuid.UUID, input dto.CreateVaultFolderDTO) (*models.VaultFolder, error)
+    GetFolders(userID uuid.UUID) ([]models.VaultFolder, error)
+    UpdateFolder(userID uuid.UUID, folderID uuid.UUID, input dto.UpdateVaultFolderDTO) (*models.VaultFolder, error)
+    DeleteFolder(userID uuid.UUID, folderID uuid.UUID) error
 }
 ```
 
-| Método | Lógica |
-|---|---|
-| `CreateItem` | Transforma DTO → `VaultItem` + `VaultSecret`, delega a `repo.Create` |
-| `GetItems` | Lista items sin secretos (optimización de rendimiento) |
-| `GetItem` | Obtiene item con `Preload("Secret")` para descifrado en cliente |
-| `UpdateItem` | Partial update — solo actualiza campos no vacíos del DTO |
-| `DeleteItem` | Verifica propiedad → soft delete |
-
-#### Partial Update (UpdateItem)
-
-El servicio aplica un patrón de actualización parcial:
-
-```go
-// Solo se actualizan campos que vienen con valor
-if input.Title != "" {
-    item.Title = input.Title
-}
-if input.FolderID != nil {
-    item.FolderID = input.FolderID
-}
-if input.Trashed != nil {
-    item.Trashed = *input.Trashed
-}
-```
-
-> Los campos `*string` y `*bool` (punteros) permiten distinguir entre "no enviado" (`nil`) y "valor vacío" (`""`/`false`).
+#### Lógica Destacada:
+- **Security Score**: Almacena una puntuación de seguridad enviada por el cliente para análisis de salud de la bóveda.
+- **Gestión de Papelera**: Los ítems se mueven a la papelera (soft delete con flag `Trashed`) antes de su eliminación permanente.
+- **Folders**: Los ítems pertenecen a una carpeta. Al eliminar una carpeta, sus ítems se reasignan automáticamente a la carpeta "Personal" (Default) mediante una transacción.
 
 ---
 
 ### `user_service.go` — `UserService`
 
-Gestión del perfil público del usuario.
-
 ```go
 type UserService interface {
-    GetProfile(userID string) (*models.UserProfile, error)
+    GetProfile(userID uuid.UUID) (*models.UserProfile, error)
     UpdateProfile(profile *models.UserProfile) error
+    DeleteAccount(userID uuid.UUID) error
 }
 ```
 
-| Método | Descripción |
-|---|---|
-| `GetProfile` | Delega a `userRepo.FindProfileByUserID` |
-| `UpdateProfile` | Delega a `userRepo.UpdateProfile` (GORM Save) |
+- **DeleteAccount**: Eliminación en cascada de toda la información del usuario (perfil, ítems, secretos, carpetas, sesiones).
 
 ---
 
 ## Inyección de Dependencias
 
+Los servicios se instancian en el `main.go` inyectando los repositorios necesarios.
+
 ```go
-// Services dependen de Repositories (interfaces)
-authService := services.NewAuthService(userRepo)
+authService := services.NewAuthService(userRepo, vaultRepo)
 vaultService := services.NewVaultService(vaultRepo)
 userService := services.NewUserService(userRepo)
 ```
@@ -147,6 +102,7 @@ userService := services.NewUserService(userRepo)
 ```mermaid
 graph TD
     AuthService --> UserRepository
+    AuthService --> VaultRepository
     VaultService --> VaultRepository
     UserService --> UserRepository
 ```

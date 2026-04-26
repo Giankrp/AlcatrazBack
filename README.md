@@ -11,13 +11,13 @@ Backend del gestor de contraseñas **Alcatraz** — una aplicación de bóveda d
 | Característica | Detalle |
 |---|---|
 | **Arquitectura Limpia** | Separación clara en capas: Handlers → Services → Repositories |
-| **Zero Knowledge** | Los datos sensibles se cifran/descifran exclusivamente en el cliente |
-| **Autenticación** | Hashing con Argon2id + JWT en cookies `HttpOnly` |
+| **Zero Knowledge** | Cifrado/descifrado exclusivo en cliente con Master Key protegida |
+| **Autenticación Robusta** | Argon2id + JWT + **2FA (TOTP)** + Backup Codes |
+| **Recuperación de Cuenta** | Sistema de Recovery Key para restaurar acceso sin perder datos |
 | **Base de Datos** | PostgreSQL 16 con GORM (auto-migraciones + soft deletes) |
-| **Validación** | DTOs con `go-playground/validator` en cada endpoint |
-| **Perfiles de Usuario** | Nombre, avatar, idioma configurable |
-| **Tipos de Vault** | Passwords, notas, tarjetas, identidades |
-| **Carpetas** | Organización de items por carpetas |
+| **Seguridad de Datos** | Cálculo de **Security Score** para ítems de la bóveda |
+| **Organización** | Gestión de **Carpetas** y Papelera (Trash) |
+| **Logs Premium** | Salida estructurada y visual con `charmbracelet/log` |
 
 ---
 
@@ -25,21 +25,22 @@ Backend del gestor de contraseñas **Alcatraz** — una aplicación de bóveda d
 
 ```
 AlcatrazBack/
-├── main.go             # Punto de entrada — inicialización y wiring de dependencias
-├── docker-compose.yml  # PostgreSQL 16 Alpine containerizado
-├── .env.example        # Variables de entorno requeridas
-│
-├── db/                 # Conexión a PostgreSQL y auto-migraciones
-├── docs/               # Documentación detallada (DATA_FLOW.md)
-├── dto/                # Data Transfer Objects — validación de entrada
-├── handlers/           # Controladores HTTP (Echo) — capa de transporte
-├── middleware/          # Middlewares personalizados (reservado para extensión)
-├── models/             # Entidades de dominio y esquema de BD (GORM)
-├── repositories/       # Acceso a datos — patrón Repository con interfaces
-├── routes/             # Definición de rutas, grupos y JWT middleware
-├── security/           # Criptografía: Argon2id hashing + comparación segura
-├── services/           # Lógica de negocio — capa de aplicación
-└── validator/          # Instancia global de validador + formateo de errores
+├── cmd/
+│   └── server/
+│       └── main.go         # Punto de entrada — inicialización y wiring
+├── internal/
+│   ├── db/                 # Conexión a PostgreSQL y auto-migraciones
+│   ├── dto/                # Data Transfer Objects — validación de entrada
+│   ├── handlers/           # Controladores HTTP (Echo) — capa de transporte
+│   ├── middleware/          # Middlewares (JWT, Logger, etc.)
+│   ├── models/             # Entidades de dominio y esquema de BD (GORM)
+│   ├── repositories/       # Acceso a datos — patrón Repository
+│   ├── routes/             # Definición de rutas y grupos
+│   ├── security/           # Criptografía: Argon2id hashing + comparación
+│   ├── services/           # Lógica de negocio — capa de aplicación
+│   └── validator/          # Instancia global de validador
+├── docs/                   # Documentación detallada
+└── docker-compose.yml      # Infraestructura (PostgreSQL 16)
 ```
 
 ---
@@ -74,6 +75,7 @@ POSTGRES_PORT=5431
 JWT_SECRET=tu_secreto_super_seguro_aqui
 DATABASE_URL=postgres://postgres:postgres@localhost:5431/alcatraz?sslmode=disable
 ALLOWED_ORIGINS=http://localhost:3000
+PORT=8080
 ```
 
 | Variable | Descripción | Default |
@@ -93,17 +95,11 @@ ALLOWED_ORIGINS=http://localhost:3000
 docker compose up -d
 ```
 
-El contenedor incluye **healthcheck** automático. Puedes verificar el estado con:
-
-```bash
-docker compose ps
-```
-
 ### 4. Instalar dependencias e iniciar
 
 ```bash
 go mod download
-go run main.go
+go run cmd/server/main.go
 ```
 
 El servidor estará disponible en `http://localhost:8080`.
@@ -116,30 +112,43 @@ Base URL: `/api`
 
 ### Autenticación (`/api/auth`) — Público
 
-| Método | Ruta | Descripción | Body |
-|---|---|---|---|
-| `POST` | `/api/auth/register` | Registrar nuevo usuario | `{ email, password }` |
-| `POST` | `/api/auth/login` | Iniciar sesión (devuelve cookie JWT) | `{ email, password }` |
-| `POST` | `/api/auth/logout` | Cerrar sesión (expira la cookie) | — |
+| Método | Ruta | Descripción |
+|---|---|---|
+| `POST` | `/api/auth/register` | Registrar nuevo usuario |
+| `POST` | `/api/auth/login` | Iniciar sesión (devuelve cookie JWT) |
+| `POST` | `/api/auth/logout` | Cerrar sesión (expira la cookie) |
+| `GET` | `/api/auth/exists` | Verificar si un email ya existe |
+| `POST` | `/api/auth/2fa/verify` | Verificar código TOTP durante el login |
+| `POST` | `/api/auth/recovery/fetch` | Obtener datos de recuperación (salt/iv) |
+| `POST` | `/api/auth/recovery/reset` | Resetear password usando Recovery Key |
 
-### Perfil de Usuario (`/api/user`) — 🔐 Protegido
+### Perfil y Seguridad (`/api/user`) — 🔐 Protegido
 
-| Método | Ruta | Descripción | Body |
-|---|---|---|---|
-| `GET` | `/api/user/profile` | Obtener perfil del usuario | — |
-| `PUT` | `/api/user/profile` | Actualizar perfil | `{ name?, avatar_url?, language? }` |
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/user/profile` | Obtener perfil del usuario |
+| `PUT` | `/api/user/profile` | Actualizar perfil (nombre, avatar, etc.) |
+| `POST` | `/api/user/change-password` | Actualizar Master Password (Zero Knowledge) |
+| `POST` | `/api/user/2fa/setup` | Generar secreto TOTP para configuración |
+| `POST` | `/api/user/2fa/enable` | Activar 2FA tras verificar código |
+| `DELETE` | `/api/user/account` | Eliminar cuenta permanentemente |
 
 ### Bóveda (`/api/vault`) — 🔐 Protegido
 
-| Método | Ruta | Descripción | Body |
-|---|---|---|---|
-| `POST` | `/api/vault/items` | Crear item en la bóveda | `{ type, title, icon?, folder_id?, secret }` |
-| `GET` | `/api/vault/items` | Listar todos los items | — |
-| `GET` | `/api/vault/items/:id` | Obtener item por ID (con secreto) | — |
-| `PUT` | `/api/vault/items/:id` | Actualizar item | `{ type?, title?, icon?, folder_id?, trashed?, secret }` |
-| `DELETE` | `/api/vault/items/:id` | Eliminar item (soft delete) | — |
-
-> 🔐 Los endpoints protegidos requieren un token JWT válido en la cookie `auth_token` (HttpOnly).
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/api/vault/items` | Listar todos los items (sin secretos) |
+| `POST` | `/api/vault/items` | Crear item en la bóveda |
+| `GET` | `/api/vault/items/:id` | Obtener item por ID (con secreto) |
+| `PUT` | `/api/vault/items/:id` | Actualizar item |
+| `DELETE` | `/api/vault/items/:id` | Mover item a la papelera |
+| `GET` | `/api/vault/trash` | Listar items en la papelera |
+| `POST` | `/api/vault/items/:id/restore` | Restaurar item de la papelera |
+| `DELETE` | `/api/vault/items/:id/permanent` | Eliminar item permanentemente |
+| `GET` | `/api/vault/folders` | Listar todas las carpetas |
+| `POST` | `/api/vault/folders` | Crear nueva carpeta |
+| `PUT` | `/api/vault/folders/:id` | Renombrar/actualizar carpeta |
+| `DELETE` | `/api/vault/folders/:id` | Eliminar carpeta |
 
 ---
 
@@ -152,7 +161,7 @@ graph LR
     Services -->|Modelo| Repositories
     Repositories -->|GORM| DB[(PostgreSQL)]
 
-    subgraph "Alcatraz Backend"
+    subgraph "Alcatraz Backend (internal/)"
         Handlers
         Services
         Repositories
@@ -169,26 +178,6 @@ graph LR
 3. **Repository** ejecuta la consulta SQL vía GORM
 4. La respuesta viaja de vuelta: Repository → Service → Handler → JSON Response
 
-### Inyección de Dependencias
-
-El wiring se realiza en `main.go` siguiendo el patrón de constructor:
-
-```go
-// Repositories
-userRepo := repositories.NewUserRepository(database)
-vaultRepo := repositories.NewVaultRepository(database)
-
-// Services (dependen de repositories)
-authService := services.NewAuthService(userRepo)
-vaultService := services.NewVaultService(vaultRepo)
-userService := services.NewUserService(userRepo)
-
-// Handlers (dependen de services)
-authHandler := handlers.NewAuthHandler(authService)
-vaultHandler := handlers.NewVaultHandler(vaultService)
-userProfileHandler := handlers.NewUserProfileHandler(userService)
-```
-
 ---
 
 ## 🔐 Seguridad
@@ -198,10 +187,8 @@ userProfileHandler := handlers.NewUserProfileHandler(userService)
 El backend **nunca** accede a datos en texto plano. El cliente es responsable de:
 
 1. Derivar una **AuthKey** desde la contraseña maestra (para autenticarse)
-2. Derivar una **EncryptionKey** desde la contraseña maestra (para cifrar/descifrar)
+2. Enviar la **Master Key cifrada** al servidor (protegida por el AuthKey o Recovery Key)
 3. Cifrar todos los datos sensibles antes de enviarlos al servidor
-
-Para más detalle, ver [docs/DATA_FLOW.md](docs/DATA_FLOW.md).
 
 ### Hashing de Contraseñas
 
@@ -212,19 +199,10 @@ Se utiliza **Argon2id** con los siguientes parámetros:
 | Memoria | 64 MB |
 | Iteraciones | 3 |
 | Paralelismo | 2 |
-| Salt | 16 bytes aleatorios |
-| Key Length | 32 bytes |
 
-### Autenticación JWT
+### Autenticación de Dos Factores (2FA)
 
-- Los tokens JWT se almacenan en cookies **HttpOnly** (no accesibles desde JavaScript)
-- Se configuran con `SameSite=Lax`
-- Expiración: **12 horas**
-- Claims incluidos: `user_id`, `email`, `exp`
-
-### CORS
-
-Configurado via variable de entorno `ALLOWED_ORIGINS`, soporta `AllowCredentials: true` para envío de cookies.
+Soporte nativo para **TOTP** (Time-based One-Time Password). Al activarse, el login requiere un segundo paso de verificación. Se proporcionan backup codes para casos de pérdida del dispositivo.
 
 ---
 
@@ -234,31 +212,9 @@ Configurado via variable de entorno `ALLOWED_ORIGINS`, soporta `AllowCredentials
 # Ejecutar todos los tests
 go test ./...
 
-# Tests del paquete security
-go test ./security/ -v
+# Tests específicos
+go test ./internal/security/ -v
 ```
-
-Actualmente incluye tests para:
-- `HashPassword` + `VerifyPassword` (contraseña correcta e incorrecta)
-- Validación de formato de hash inválido
-- `NeedsRehash` (detección de parámetros cambiados)
-
----
-
-## 📚 Documentación Detallada
-
-| Documento | Descripción |
-|---|---|
-| [docs/DATA_FLOW.md](docs/DATA_FLOW.md) | Flujo de datos completo y arquitectura Zero Knowledge |
-| [db/README.md](db/README.md) | Conexión a base de datos y migraciones |
-| [dto/README.md](dto/README.md) | Data Transfer Objects y validación |
-| [handlers/README.md](handlers/README.md) | Controladores HTTP |
-| [models/README.md](models/README.md) | Entidades de dominio y esquema |
-| [repositories/README.md](repositories/README.md) | Capa de acceso a datos |
-| [routes/README.md](routes/README.md) | Definición de rutas y middleware JWT |
-| [security/README.md](security/README.md) | Utilidades criptográficas |
-| [services/README.md](services/README.md) | Lógica de negocio |
-| [validator/README.md](validator/README.md) | Validación de datos |
 
 ---
 
@@ -271,6 +227,7 @@ Actualmente incluye tests para:
 | GORM | v1.31 | ORM para PostgreSQL |
 | PostgreSQL | 16 Alpine | Base de datos relacional |
 | Argon2id | — | Hashing de contraseñas |
+| TOTP (pquerna/otp) | — | Autenticación 2FA |
 | JWT (golang-jwt) | v5 | Autenticación por tokens |
-| go-playground/validator | v10 | Validación de structs |
+| charmbracelet/log | — | Logging estructurado |
 | Docker Compose | — | Infraestructura local |

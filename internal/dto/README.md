@@ -1,150 +1,69 @@
 # 📦 DTO Package (`dto`)
 
-DTO = **Data Transfer Object**. Este paquete define las estructuras que representan la entrada/salida de datos entre el cliente y la API.
+DTO = **Data Transfer Object**. Este paquete define las estructuras que representan el contrato de entrada/salida entre el cliente y la API, desacoplando la lógica interna de persistencia de la interfaz pública.
 
 ---
 
 ## Responsabilidades
 
-- Definir la estructura exacta de los JSON de entrada para cada endpoint
-- Desacoplar la estructura interna de la BD (Models) de la interfaz pública de la API
-- Incluir reglas de validación (`validate:"..."`) usando [go-playground/validator](https://github.com/go-playground/validator)
-
----
-
-## Diferencia entre DTOs y Models
-
-| Aspecto | DTO | Model |
-|---|---|---|
-| **Propósito** | Intención del usuario (lo que envía) | Persistencia en BD (lo que se guarda) |
-| **Ejemplo** | `Password` (texto plano para login) | `PasswordHash` (hash Argon2id) |
-| **Validación** | Tags `validate:"..."` | Tags `gorm:"..."` |
-| **Visibilidad** | Contrato público de la API | Estructura interna |
+- Definir la estructura exacta de los JSON de entrada/salida.
+- Incluir reglas de validación (`validate:"..."`) para asegurar la integridad de los datos antes de procesarlos.
+- Ocultar campos internos que no deben exponerse directamente (ej. hashes de contraseñas).
 
 ---
 
 ## Archivos y Estructuras
 
-### `auth.go` — Autenticación
+### `auth.go` — Autenticación y Seguridad
 
-```go
-type RegisterDTO struct {
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required,min=8"`
-}
+#### `RegisterDTO`
+Utilizado para el registro inicial. Incluye todos los metadatos necesarios para el modelo Zero Knowledge.
+- **Master Key Metadata**: IV, Salt y la propia MK cifrada con la contraseña.
+- **Recovery Metadata**: IV, Salt y MK cifrada con la clave de recuperación.
 
-type LoginDTO struct {
-    Email    string `json:"email" validate:"required,email"`
-    Password string `json:"password" validate:"required"`
-}
-```
+#### `LoginDTO` & `LoginResponseDTO`
+- El login devuelve los metadatos de la Master Key para que el cliente pueda descifrarla localmente.
+- Si el 2FA está activo, devuelve `require_2fa: true` y un token temporal.
 
-| Campo | Validación | Usado en |
-|---|---|---|
-| `Email` | Requerido, formato email válido | Register, Login |
-| `Password` | Requerido, mín. 8 caracteres (registro) | Register, Login |
+#### `2FA DTOs`
+- `Enable2FADTO`: Para activar el MFA tras verificar el primer código.
+- `Verify2FADTO`: Para la verificación durante el proceso de login.
 
----
+#### `ChangeMasterPasswordDTO`
+Permite la rotación de la contraseña maestra actualizando atómicamente el hash de autenticación y los bloques cifrados de la MK.
 
-### `vault.go` — Bóveda de Secretos
-
-#### Tipos de Item
-
-```go
-const (
-    ItemTypePassword VaultItemType = "password"
-    ItemTypeNote     VaultItemType = "note"
-    ItemTypeCard     VaultItemType = "card"
-    ItemTypeIdentity VaultItemType = "identity"
-)
-```
-
-#### `CreateVaultItemDTO`
-
-```go
-type CreateVaultItemDTO struct {
-    FolderID *string       `json:"folder_id"`
-    ItemType VaultItemType `json:"type" validate:"required,oneof=password note card identity"`
-    Title    string        `json:"title" validate:"required"`
-    Icon     string        `json:"icon"`
-    Secret   Secret        `json:"secret" validate:"required"`
-}
-```
-
-#### `Secret` (Blob cifrado)
-
-```go
-type Secret struct {
-    Data string `json:"data" validate:"required"`  // Datos cifrados (base64)
-    Iv   string `json:"iv" validate:"required"`    // Vector de inicialización
-    Salt string `json:"salt" validate:"required"`  // Salt del cifrado
-}
-```
-
-> ⚠️ Estos campos contienen datos **ya cifrados** por el cliente. El servidor los almacena tal cual (Zero Knowledge).
-
-#### `UpdateVaultItemDTO`
-
-```go
-type UpdateVaultItemDTO struct {
-    FolderID *string       `json:"folder_id"`
-    ItemType VaultItemType `json:"type" validate:"omitempty,oneof=password note card identity"`
-    Title    string        `json:"title"`
-    Icon     string        `json:"icon"`
-    Trashed  *bool         `json:"trashed"`
-    Secret   Secret        `json:"secret" validate:"required"`
-}
-```
-
-#### `CreateVaultFolderDTO`
-
-```go
-type CreateVaultFolderDTO struct {
-    Name string `json:"name" validate:"required"`
-}
-```
+#### `Recovery DTOs`
+- `FetchRecoveryDTO`: Para obtener la metadata de recuperación asociada a un email.
+- `ResetPasswordDTO`: Para restaurar el acceso usando la Recovery Key.
 
 ---
 
-### `user_profileDto.go` — Perfil de Usuario
+### `vault.go` — Bóveda y Carpetas
 
-```go
-type UpdateUserProfileDTO struct {
-    Name      string `json:"name" validate:"omitempty,min=1,max=50"`
-    AvatarURL string `json:"avatar_url" validate:"omitempty,url"`
-    Language  string `json:"language" validate:"omitempty,oneof=es en fr de pt"`
-}
-```
+#### `CreateVaultItemDTO` & `UpdateVaultItemDTO`
+Representan un ítem de la bóveda.
+- **Secret**: Objeto anidado que contiene el blob cifrado (`data`), el `iv` y el `salt`.
+- **SecurityScore**: Puntuación de salud del ítem.
 
-| Campo | Validación | Valores permitidos |
-|---|---|---|
-| `Name` | Opcional, 1-50 caracteres | Texto libre |
-| `AvatarURL` | Opcional, URL válida | URL |
-| `Language` | Opcional, valor fijo | `es`, `en`, `fr`, `de`, `pt` |
+#### `Folder DTOs`
+- `CreateVaultFolderDTO`: Para nuevas carpetas.
+- `UpdateVaultFolderDTO`: Para renombrar carpetas existentes.
 
 ---
 
-## Ejemplo de JSON de Entrada
+### `user_profileDto.go` — Perfil
 
-### Registro
-```json
-{
-    "email": "user@example.com",
-    "password": "mi_password_segura"
-}
-```
+- `UpdateUserProfileDTO`: Para cambios en nombre, avatar e idioma.
 
-### Crear Item de Bóveda
-```json
-{
-    "type": "password",
-    "title": "Mi cuenta de GitHub",
-    "icon": "github",
-    "folder_id": null,
-    "secret": {
-        "data": "base64_encrypted_blob...",
-        "iv": "base64_iv...",
-        "salt": "base64_salt..."
-    }
-}
-```
+---
+
+## Validación
+
+Se utiliza `go-playground/validator`. Algunas reglas comunes aplicadas:
+- `required`: El campo no puede estar vacío.
+- `email`: Debe ser un formato de correo válido.
+- `min=8`: Longitud mínima para contraseñas.
+- `oneof=...`: Restringe el valor a una lista permitida (ej. tipos de ítem).
+- `url`: Valida que el avatar_url sea una URL válida.
+
+> 🔒 **Importante**: Los DTOs de entrada para datos sensibles (Secret) siempre esperan strings que ya han sido cifrados en el cliente. El servidor nunca recibe el secreto en texto plano.
