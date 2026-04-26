@@ -76,8 +76,8 @@ func (s *vaultService) CreateItem(userID uuid.UUID, input dto.CreateVaultItemDTO
 	}
 
 	item := &models.VaultItem{
-		UserID:   userID,
-		FolderID: folderID,
+		UserID:        userID,
+		FolderID:      folderID,
 		ItemType:      models.VaultItemType(input.ItemType),
 		Title:         input.Title,
 		Icon:          input.Icon,
