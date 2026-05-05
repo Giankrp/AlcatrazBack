@@ -1,3 +1,4 @@
+// Package routes wires up all HTTP routes and applies JWT middleware to protected groups.
 package routes
 
 import (

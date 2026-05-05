@@ -109,6 +109,19 @@ Contiene el `EncryptedData`, que es un JSON cifrado en el cliente con la Master 
 ### `vault_folder.go` — `VaultFolder`
 
 - **IsDefault**: Indica si es la carpeta raíz ("Personal") que no puede eliminarse.
+- Al eliminar una carpeta no-default, sus ítems se reasignan automáticamente a la carpeta default mediante una transacción.
+
+---
+
+### `session.go` — `Session`
+
+Modelo reservado para gestión de sesiones activas. Actualmente se migra a la BD pero no se usa activamente (la autenticación se gestiona via cookies JWT stateless). Está preparado para implementar revocación de sesiones o gestión multi-dispositivo en el futuro.
+
+---
+
+### `user_profile.go` — `UserProfile`
+
+Datos no sensibles del usuario separados del modelo `User` (nombre para mostrar, avatar, idioma). Se crea automáticamente al registrarse y se recupera junto al perfil con `Preload("User")`.
 
 ---
 

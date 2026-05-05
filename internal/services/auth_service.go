@@ -1,3 +1,5 @@
+// Package services contains the business logic layer of the Alcatraz application.
+// Services are transport-agnostic and work with domain types (UUIDs, models, DTOs).
 package services
 
 import (
@@ -72,7 +74,7 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Hash recovery key
 	hashedRecoveryKey, err := security.HashPassword(registerDTO.RecoveryKey)
 	if err != nil {
@@ -82,16 +84,16 @@ func (s *authService) Register(registerDTO dto.RegisterDTO) error {
 	name := strings.Split(registerDTO.Email, "@")[0]
 
 	user := &models.User{
-		Email:              registerDTO.Email,
-		PasswordHash:       hashedPassword,
-		RecoveryKeyHash:    hashedRecoveryKey,
-		ProtectedMasterKey: registerDTO.ProtectedMasterKey,
-		MasterKeyIV:        registerDTO.MasterKeyIV,
-		MasterKeySalt:      registerDTO.MasterKeySalt,
+		Email:                      registerDTO.Email,
+		PasswordHash:               hashedPassword,
+		RecoveryKeyHash:            hashedRecoveryKey,
+		ProtectedMasterKey:         registerDTO.ProtectedMasterKey,
+		MasterKeyIV:                registerDTO.MasterKeyIV,
+		MasterKeySalt:              registerDTO.MasterKeySalt,
 		RecoveryProtectedMasterKey: registerDTO.RecoveryProtectedMasterKey,
 		RecoveryKeyIV:              registerDTO.RecoveryKeyIV,
 		RecoveryKeySalt:            registerDTO.RecoveryKeySalt,
-		CreatedAt:          time.Now(),
+		CreatedAt:                  time.Now(),
 	}
 
 	if err := s.userRepo.Create(user); err != nil {
@@ -350,6 +352,7 @@ func (s *authService) ResetPasswordWithRecoveryKey(input dto.ResetPasswordDTO) e
 	}
 
 	// 1. Verify Recovery Key
+	//
 	match, err := security.VerifyPassword(input.RecoveryKey, user.RecoveryKeyHash)
 	if err != nil {
 		return err

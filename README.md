@@ -49,7 +49,7 @@ AlcatrazBack/
 
 ### Requisitos Previos
 
-- **Go** 1.25+ (ver `go.mod`)
+- **Go** 1.22+ (ver `go.mod`)
 - **Docker** + **Docker Compose** (para PostgreSQL)
 
 ### 1. Clonar el repositorio
@@ -88,6 +88,7 @@ PORT=8080
 | `DATABASE_URL` | Cadena de conexión completa | Construir con las variables anteriores |
 | `ALLOWED_ORIGINS` | Orígenes permitidos CORS (separados por `,`) | `http://localhost:3000` |
 | `PORT` | Puerto del servidor HTTP | `8080` |
+| `ENV` | Entorno de ejecución (`production` activa Secure en cookies) | *(vacío = desarrollo)* |
 
 ### 3. Levantar la base de datos
 
@@ -222,12 +223,12 @@ go test ./internal/security/ -v
 
 | Tecnología | Versión | Uso |
 |---|---|---|
-| Go | 1.25+ | Lenguaje principal |
-| Echo | v4.13 | Framework HTTP |
-| GORM | v1.31 | ORM para PostgreSQL |
+| Go | 1.22+ | Lenguaje principal |
+| Echo | v4.13.4 | Framework HTTP |
+| GORM | v1.31.1 | ORM para PostgreSQL |
 | PostgreSQL | 16 Alpine | Base de datos relacional |
-| Argon2id | — | Hashing de contraseñas |
-| TOTP (pquerna/otp) | — | Autenticación 2FA |
-| JWT (golang-jwt) | v5 | Autenticación por tokens |
-| charmbracelet/log | — | Logging estructurado |
-| Docker Compose | — | Infraestructura local |
+| Argon2id | golang.org/x/crypto | Hashing de contraseñas |
+| TOTP (pquerna/otp) | v1.5.0 | Autenticación 2FA |
+| JWT (golang-jwt) | v5.3.0 | Autenticación por tokens |
+| charmbracelet/log | v1.0.0 | Logging estructurado |
+| Docker Compose | v2 | Infraestructura local |

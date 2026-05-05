@@ -13,14 +13,17 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
+// UserProfileHandler manages HTTP requests for user profile operations and account management.
 type UserProfileHandler struct {
 	userProfileService services.UserService
 }
 
+// NewUserProfileHandler creates a new instance of the user profile controller.
 func NewUserProfileHandler(userProfileService services.UserService) *UserProfileHandler {
 	return &UserProfileHandler{userProfileService: userProfileService}
 }
 
+// GetProfile returns the authenticated user's profile data, including 2FA status.
 func (u *UserProfileHandler) GetProfile(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -43,6 +46,9 @@ func (u *UserProfileHandler) GetProfile(c echo.Context) error {
 	})
 }
 
+
+// UpdateProfile updates editable profile fields (name, avatar URL, language).
+// Only non-empty fields in the request body are updated (partial update).
 func (u *UserProfileHandler) UpdateProfile(c echo.Context) error {
 	var update dto.UpdateUserProfileDTO
 
@@ -73,11 +79,16 @@ func (u *UserProfileHandler) UpdateProfile(c echo.Context) error {
 		profile.Language = update.Language
 	}
 
-	u.userProfileService.UpdateProfile(&profile)
-	return c.JSON(http.StatusOK, echo.Map{"Message": "User updated"})
+	if err := u.userProfileService.UpdateProfile(&profile); err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "Failed to update profile"})
+	}
+	return c.JSON(http.StatusOK, echo.Map{"message": "profile updated successfully"})
 
 }
 
+
+// DeleteAccount permanently deletes the authenticated user's account and all associated data
+// (vault items, secrets, folders, profile). It also expires the auth cookie on success.
 func (u *UserProfileHandler) DeleteAccount(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {

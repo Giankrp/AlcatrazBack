@@ -33,15 +33,15 @@ test-security:
 
 # Start services with Docker Compose
 up:
-    docker-compose up -d
+    docker compose up -d
 
 # Stop Docker Compose services
 down:
-    docker-compose down
+    docker compose down
 
 # Show container logs
 logs:
-    docker-compose logs -f
+    docker compose logs -f
 
 # Clear all table data (WARNING: Destructive!)
 reset-db:

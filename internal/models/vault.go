@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/datatypes"
 )
 
 type VaultItemType string
@@ -50,14 +49,4 @@ type VaultSecret struct {
 	// Encryption Metadata
 	IV   string `gorm:"not null" json:"iv"`   // Unique IV per item.
 	Salt string `gorm:"not null" json:"salt"` // Optional Salt used to derive per-item keys from the Master Key.
-}
-
-// VaultItemMeta is an auxiliary structure to store non-encrypted additional data (e.g., tags).
-type VaultItemMeta struct {
-	Tags []string `json:"tags"`
-}
-
-// VaultItemPublicData represents data as queryable JSONB (NOT encrypted).
-type VaultItemPublicData struct {
-	Data datatypes.JSON `gorm:"type:jsonb"`
 }

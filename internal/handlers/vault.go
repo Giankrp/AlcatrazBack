@@ -5,38 +5,35 @@ import (
 
 	"github.com/Giankrp/AlcatrazBack/internal/dto"
 	"github.com/Giankrp/AlcatrazBack/internal/services"
-	"github.com/go-playground/validator/v10"
+	"github.com/Giankrp/AlcatrazBack/internal/validator"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 )
 
-// VaultHandler manages HTTP requests for vault handling (items and folders).
+// VaultHandler manages HTTP requests for vault items and folders.
 type VaultHandler struct {
-	service   services.VaultService
-	validator *validator.Validate
+	service services.VaultService
 }
 
 // NewVaultHandler creates a new instance of the vault controller.
 func NewVaultHandler(service services.VaultService) *VaultHandler {
-	return &VaultHandler{
-		service:   service,
-		validator: validator.New(),
-	}
+	return &VaultHandler{service: service}
 }
 
+// CreateItem creates a new encrypted vault item for the authenticated user.
+// The encrypted payload is accepted as-is and stored without inspection (Zero Knowledge).
 func (h *VaultHandler) CreateItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
 		return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Unauthorized"})
 	}
-
 	var input dto.CreateVaultItemDTO
 	if err := c.Bind(&input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if err := h.validator.Struct(input); err != nil {
+	if err := validator.Validate.Struct(input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
@@ -51,6 +48,8 @@ func (h *VaultHandler) CreateItem(c echo.Context) error {
 	return c.JSON(http.StatusCreated, item)
 }
 
+// GetItems returns all active (non-trashed) vault items for the authenticated user.
+// Encrypted secrets are NOT included in list responses for performance reasons.
 func (h *VaultHandler) GetItems(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -63,6 +62,7 @@ func (h *VaultHandler) GetItems(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// GetTrash returns all vault items currently in the trash for the authenticated user.
 func (h *VaultHandler) GetTrash(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -75,6 +75,7 @@ func (h *VaultHandler) GetTrash(c echo.Context) error {
 	return c.JSON(http.StatusOK, items)
 }
 
+// GetItem returns a specific vault item by ID, including its encrypted secret payload.
 func (h *VaultHandler) GetItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -91,6 +92,7 @@ func (h *VaultHandler) GetItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
+// UpdateItem updates a vault item's metadata and/or its encrypted secret payload.
 func (h *VaultHandler) UpdateItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -106,7 +108,7 @@ func (h *VaultHandler) UpdateItem(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if err := h.validator.Struct(input); err != nil {
+	if err := validator.Validate.Struct(input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
@@ -121,6 +123,7 @@ func (h *VaultHandler) UpdateItem(c echo.Context) error {
 	return c.JSON(http.StatusOK, item)
 }
 
+// MoveToTrash performs a soft-delete on a vault item, moving it to the trash.
 func (h *VaultHandler) MoveToTrash(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -138,6 +141,7 @@ func (h *VaultHandler) MoveToTrash(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// RestoreItem recovers a previously trashed vault item, making it active again.
 func (h *VaultHandler) RestoreItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -155,6 +159,8 @@ func (h *VaultHandler) RestoreItem(c echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// DeleteItem permanently removes a vault item and its associated secret from the database.
+// This operation is irreversible. The item must be in the trash before it can be deleted permanently.
 func (h *VaultHandler) DeleteItem(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -174,6 +180,7 @@ func (h *VaultHandler) DeleteItem(c echo.Context) error {
 
 // Folder Handlers
 
+// CreateFolder creates a new folder for organizing vault items.
 func (h *VaultHandler) CreateFolder(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -185,7 +192,7 @@ func (h *VaultHandler) CreateFolder(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if err := h.validator.Struct(input); err != nil {
+	if err := validator.Validate.Struct(input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
@@ -200,6 +207,7 @@ func (h *VaultHandler) CreateFolder(c echo.Context) error {
 	return c.JSON(http.StatusCreated, folder)
 }
 
+// GetFolders returns all folders belonging to the authenticated user.
 func (h *VaultHandler) GetFolders(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -214,6 +222,7 @@ func (h *VaultHandler) GetFolders(c echo.Context) error {
 	return c.JSON(http.StatusOK, folders)
 }
 
+// UpdateFolder modifies an existing folder's metadata (e.g., name).
 func (h *VaultHandler) UpdateFolder(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {
@@ -229,7 +238,7 @@ func (h *VaultHandler) UpdateFolder(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
 	}
 
-	if err := h.validator.Struct(input); err != nil {
+	if err := validator.Validate.Struct(input); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
@@ -241,6 +250,7 @@ func (h *VaultHandler) UpdateFolder(c echo.Context) error {
 	return c.JSON(http.StatusOK, folder)
 }
 
+// DeleteFolder deletes a folder. Its items are automatically reassigned to the default (Personal) folder.
 func (h *VaultHandler) DeleteFolder(c echo.Context) error {
 	userID := getUserIDFromToken(c)
 	if userID == uuid.Nil {

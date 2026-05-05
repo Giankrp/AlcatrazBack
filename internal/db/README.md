@@ -52,12 +52,12 @@ DATABASE_URL=postgres://postgres:postgres@localhost:5431/alcatraz?sslmode=disabl
 // 1. Conectar
 database, err := db.NewConnection()
 if err != nil {
-    e.Logger.Fatal("Error connecting to database: ", err)
+    log.Fatal("Error connecting to database", "error", err)
 }
 
 // 2. Migrar esquema
 if err := db.AutoMigrate(database); err != nil {
-    e.Logger.Fatal("Error migrating database: ", err)
+    log.Fatal("Error migrating database", "error", err)
 }
 ```
 

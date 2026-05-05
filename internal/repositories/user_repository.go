@@ -1,3 +1,5 @@
+// Package repositories implements the data access layer for the Alcatraz application.
+// Each repository defines an interface (contract) and a private GORM-based implementation.
 package repositories
 
 import (

@@ -1,3 +1,4 @@
+// Package dto contains the Data Transfer Objects (request/response contracts) for the Alcatraz API.
 package dto
 
 type RegisterDTO struct {

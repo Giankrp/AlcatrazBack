@@ -1,3 +1,6 @@
+// Package handlers contains the HTTP controllers (handlers) for the Alcatraz API.
+// Each handler is responsible for parsing, validating, and delegating requests
+// to the appropriate service layer, then formatting the HTTP response.
 package handlers
 
 import (
@@ -268,7 +271,6 @@ func (h *AuthHandler) FetchRecoveryData(c echo.Context) error {
 	if err != nil {
 		if err.Error() == "user not found" {
 			// To prevent email enumeration during recovery, we could return 200 with fake data,
-			// but for a TFG, returning 404 or a generic message is acceptable.
 			return c.JSON(http.StatusNotFound, echo.Map{"error": "user not found"})
 		}
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": "internal server error"})
