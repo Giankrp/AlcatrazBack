@@ -90,8 +90,9 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteNoneMode,
+		Secure:      true,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
@@ -200,14 +201,15 @@ func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
 	}
 
 	// Set final JWT as HttpOnly cookie
-	isProd := os.Getenv("ENV") == "production"
+	//isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		Secure:      true,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
@@ -223,14 +225,15 @@ func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
 func (h *AuthHandler) Logout(c echo.Context) error {
 	log.Debug("Logout attempt")
 	// Expire the auth cookie
-	isProd := os.Getenv("ENV") == "production"
+	//isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		Secure:      true,
+		SameSite:    http.SameSiteNoneMode,
+		Partitioned: true,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	}
