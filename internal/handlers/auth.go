@@ -84,13 +84,13 @@ func (h *AuthHandler) Login(c echo.Context) error {
 	}
 
 	// Set JWT as HttpOnly cookie
-	isProd := os.Getenv("ENV") == "production"
+	//isProd := os.Getenv("ENV") == "production"
 	cookie := &http.Cookie{
 		Name:     "auth_token",
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProd,
+		Secure:   true,
 		SameSite: http.SameSiteNoneMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
