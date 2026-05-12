@@ -91,7 +91,7 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
