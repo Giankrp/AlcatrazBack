@@ -90,9 +90,8 @@ func (h *AuthHandler) Login(c echo.Context) error {
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:      true,
-		SameSite:    http.SameSiteNoneMode,
-		Partitioned: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
@@ -207,9 +206,8 @@ func (h *AuthHandler) Verify2FALogin(c echo.Context) error {
 		Value:    loginRes.Token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:      true,
-		SameSite:    http.SameSiteNoneMode,
-		Partitioned: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		MaxAge:   60 * 60 * 12, // 12 hours
 	}
 	c.SetCookie(cookie)
@@ -231,9 +229,8 @@ func (h *AuthHandler) Logout(c echo.Context) error {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
-		Secure:      true,
-		SameSite:    http.SameSiteNoneMode,
-		Partitioned: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 	}
