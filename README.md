@@ -232,3 +232,10 @@ go test ./internal/security/ -v
 | JWT (golang-jwt) | v5.3.0 | Autenticación por tokens |
 | charmbracelet/log | v1.0.0 | Logging estructurado |
 | Docker Compose | v2 | Infraestructura local |
+
+---
+
+## ⚖️ Licencia
+
+Este proyecto está bajo la Licencia **GNU GPL v3**. Para más detalles, consulta el archivo [LICENSE](file:///home/gian/Documents/AlcatrazBack/LICENSE).
+
