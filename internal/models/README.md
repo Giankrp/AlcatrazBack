@@ -19,33 +19,34 @@ Define las **Entidades de Dominio** y su representación como tablas en PostgreS
 erDiagram
     User ||--o{ VaultItem : "tiene"
     User ||--|| UserProfile : "tiene"
-    User ||--o{ Session : "tiene"
     User ||--o{ VaultFolder : "tiene"
     VaultItem ||--|| VaultSecret : "tiene"
-    VaultFolder ||--o{ VaultItem : "contiene"
+    VaultFolder |o--o{ VaultItem : "contiene"
 
     User {
         uuid ID PK
         string Email UK
-        string PasswordHash "Hash del AuthKey"
-        string RecoveryKeyHash "Hash del RecoveryKey"
-        string ProtectedMasterKey "MK cifrada con AuthKey"
+        string PasswordHash
+        string RecoveryKeyHash
+        string ProtectedMasterKey
         string MasterKeyIV
         string MasterKeySalt
-        string RecoveryProtectedMasterKey "MK cifrada con RecoveryKey"
+        string RecoveryProtectedMasterKey
         string RecoveryKeyIV
         string RecoveryKeySalt
         bool TwoFactorEnabled
         string TwoFactorSecret
-        jsonb TwoFactorBackupCodes
+        json TwoFactorBackupCodes
         timestamp CreatedAt
     }
 
     UserProfile {
-        uuid UserID PK_FK
+        uuid UserID PK, FK
         string Name
         string AvatarURL
         string Language
+        timestamp CreatedAt
+        timestamp UpdatedAt
     }
 
     VaultItem {
@@ -54,6 +55,7 @@ erDiagram
         uuid FolderID FK
         string ItemType
         string Title
+        string Icon
         int SecurityScore
         bool Trashed
         timestamp CreatedAt
@@ -62,8 +64,8 @@ erDiagram
     }
 
     VaultSecret {
-        uuid VaultItemID PK_FK
-        string EncryptedData "Blob cifrado con MK"
+        uuid VaultItemID PK, FK
+        string EncryptedData
         string IV
         string Salt
     }
@@ -73,6 +75,7 @@ erDiagram
         uuid UserID FK
         string Name
         bool IsDefault
+        timestamp CreatedAt
     }
 ```
 
