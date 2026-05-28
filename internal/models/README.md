@@ -87,24 +87,26 @@ erDiagram
 
 El modelo `User` es el pilar de la seguridad Zero Knowledge.
 
-| Campo | Propósito |
-|---|---|
-| `PasswordHash` | Hash de la clave de autenticación (no es la Master Password) |
-| `RecoveryKeyHash` | Hash para validar el uso de la clave de recuperación |
-| `ProtectedMasterKey` | El "tesoro": la Master Key del usuario cifrada para que el servidor solo la guarde |
-| `RecoveryProtectedMasterKey` | Copia de la MK cifrada con la Recovery Key para emergencias |
-| `TwoFactorEnabled` | Flag de activación de MFA |
-| `TwoFactorSecret` | Semilla TOTP cifrada/protegida |
+| Campo                        | Propósito                                                                          |
+| ---------------------------- | ---------------------------------------------------------------------------------- |
+| `PasswordHash`               | Hash de la clave de autenticación (no es la Master Password)                       |
+| `RecoveryKeyHash`            | Hash para validar el uso de la clave de recuperación                               |
+| `ProtectedMasterKey`         | El "tesoro": la Master Key del usuario cifrada para que el servidor solo la guarde |
+| `RecoveryProtectedMasterKey` | Copia de la MK cifrada con la Recovery Key para emergencias                        |
+| `TwoFactorEnabled`           | Flag de activación de MFA                                                          |
+| `TwoFactorSecret`            | Semilla TOTP cifrada/protegida                                                     |
 
 ---
 
 ### `vault.go` — `VaultItem` + `VaultSecret`
 
 #### `VaultItem` (Metadatos)
+
 - **Security Score**: Puntuación (0-100) que indica la fortaleza de la contraseña o salud del ítem.
 - **Trashed**: Flag para borrado suave (papelera).
 
 #### `VaultSecret` (Carga útil)
+
 Contiene el `EncryptedData`, que es un JSON cifrado en el cliente con la Master Key del usuario. Separado para optimizar listados.
 
 ---

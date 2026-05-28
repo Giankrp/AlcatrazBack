@@ -238,4 +238,3 @@ go test ./internal/security/ -v
 ## ⚖️ Licencia
 
 Este proyecto está bajo la Licencia **GNU GPL v3**. Para más detalles, consulta el archivo [LICENSE](file:///home/gian/Documents/AlcatrazBack/LICENSE).
-
